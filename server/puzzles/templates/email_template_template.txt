@@ -1,0 +1,6 @@
+{% block content %}
+{% endblock %}
+
+---
+
+{% if because_registered %}You are receiving this email because you have registered for FIXME Hunt.{% else %}You are receiving this email because you are participating in FIXME Hunt.{% endif %}{% if unsubscribe_url %} If you wish to no longer receive FIXME Hunt emails, you can unsubscribe at {{ unsubscribe_url }} .{% endif %}

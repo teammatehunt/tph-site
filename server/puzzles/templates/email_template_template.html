@@ -1,0 +1,11 @@
+{% spaceless %}
+<style type="text/css">p {margin-bottom: 1em;}</style>
+<table align="center" width="100%" style="max-width: 600px; line-height: normal;" border="0" cellspacing="0" cellpadding="0">
+    <tr>
+        <td>
+            <div>{% block content %}{% endblock %}</div>
+            <p style="font-size: smaller !important; color: #666 !important;">{% if because_registered %}You are receiving this email because you have registered for FIXME Hunt.{% else %}You are receiving this email because you are participating in FIXME Hunt.{% endif %}{% if unsubscribe_url %} If you wish to no longer receive FIXME Hunt emails, you can <a href="{{ unsubscribe_url }}" style="color: inherit; font-weight: inherit; text-decoration: underline;">unsubscribe</a>.{% endif %}</p>
+        </td>
+    </tr>
+</table>
+{% endspaceless %}

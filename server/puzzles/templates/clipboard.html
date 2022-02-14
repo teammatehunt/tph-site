@@ -1,0 +1,387 @@
+<html>
+  <!--
+    This file contains code for a copy-to-clipboard function for copying an
+    HTML element. About 60% of this is example puzzle code to demonstrate its
+    use and the rest contains the actual clipboard functionality.
+
+    This is a stripped down version of what we used for Teammate Hunt, where we
+    also utilized React components to help with some of the encapsulation and
+    animation. The only dependency here is jQuery. This should work on modern
+    browsers (but not Internet Explorer), but we've primarily tested with
+    Chrome and Firefox.
+
+    We recommend that you use this as a proof-of-concept and then encapsulate
+    it with your web stack.
+
+    Writing copyable HTML for puzzles takes a bit of consideration in some cases.
+    - Styles/formatting that you want to be copied should always be inserted
+      inline (rather than using an internal or external stylesheet). This is
+      because Firefox copies the element directly rather than assign the full
+      style properties that are rendered.
+    - When you change a font style, you should add a dummy element that changes
+      it back. This is because Google Sheets will keep applying that style to the
+      following cells, even if that style was not for an ancestor element. This
+      is a problem in Firefox (but not Chrome because Chrome inserts the rendered
+      styles for every element).
+    - When pasting into Google Sheets, styles will apply to the entire cell or
+      not at all. You can't have a style apply to part of a cell (eg. bolding a
+      word in a sentence) when pasting from the clipboard, even though Sheets
+      allows partial formatting within a cell through other means.
+    - You cannot assign custom border properties to table cells to each of the
+      four sides. You can assign properties for up to 3 of the sides, but if you
+      assign properties to all 4, Google Sheets will use the same border property
+      for all 4 sides. (Depending on what you're trying to do, you can try to get
+      around this by picking which of the two neighboring cells to put the border
+      property on since the border from either one will apply to the border
+      between them.) Moreover, when assigning custom borders, you must use the
+      border-top, border-right, border-bottom, and border-left properties, not
+      the border-width, border-style, and border-color properties. (If all 4
+      borders are the same, you can just use the border property)
+    - If you want to have multiple columns, use the table class. Other ways of
+      formatting into grid-like structures (like display: grid; or even display:
+      table;) will cause the contents to be in separate rows of the same column.
+    - Sometimes you will need to be tricky to display what a puzzle how you
+      want it to look while also copying it how you want it to be copied. When
+      this matters, consider using the transform property. For example, notice
+      how this example resizes the numbers in the crossword using transform
+      instead of changing the font-size. When all else fails, or when it is
+      complicated to make both work simultaneously, create separate elements to
+      display in the web view and for the function to copy.
+    - We define a "clipboard-only" class that is not visible in the web view
+      but will be copied to the clipboard anyways. This is useful for when
+      creating a separate element to copy (see the end of the previous bullet),
+      but can also be used to inject text such as "See image on original puzzle
+      page" or include other formatting (like the numbering in ordered lists).
+      Similarly, we define a "no-copy" class that will be excluded when the
+      ancestor element is copied.
+    - Contents are pasted directly into cells. This means that contents that
+      start with "=" should be prefixed with a "'", unless you are trying to
+      paste a formula.
+    - Images that are not accessible at a public url cannot be pasted into
+      Google Sheets. (At least, I have not been able to figure out how. As far as
+      I can tell, Google Sheets won't render a data url either.) If your images
+      are publicly available, you can display them in sheets with a formula
+      (=IMAGE("http://yoururl.com/blah")).
+
+    When debugging your clipboard contents, it is helpful to have a tool that
+    can paste the text/html output as a string. For example, if you have xclip,
+    you can run the following command.
+      xclip -sel clip -o -t text/html
+  -->
+  <head>
+    <title>
+      Copy-to-Clipboard Puzzle Example
+    </title>
+    <style>
+      /* Class for elements we want to copy but not be visible on the webpage */
+      .clipboard-only {
+        display: none;
+      }
+
+      textarea#clipboard-contents {
+        /* Hide the text to copy. */
+        display: none;
+      }
+      button#clipboard-button {
+        border-radius: 20px;
+        font-size: 20px;
+        line-height: 48px;
+        height: 48px;
+        padding: 0 12px;
+        position: fixed;
+        cursor: pointer;
+        bottom: 32px;
+        right: 32px;
+        overflow: hidden;
+        max-width: 480px;
+        transition: max-width 300ms ease-in-out; /* unused without animation */
+        word-break: break-all;
+      }
+
+      /* BEGIN EXAMPLE PUZZLE CODE */
+
+      /* Table grid properties. These will not copy on Firefox, so use for
+         styles that affect formatting for web (not copy-paste) only.
+       */
+      table {
+        border-collapse: collapse;
+        text-align: center;
+      }
+      td {
+        /* firefox is dumb af */
+        background-clip: padding-box;
+        height: 30px;
+        width: 30px;
+        position: relative; /* so that "position: absolute;" works below */
+      }
+      /* Crossword number format
+         Scale numbers with transform so that we don't mess with font sizes
+         when pasting.
+       */
+      .number {
+        position: absolute;
+        width: min-content;
+        height: 33%;
+        text-align: left;
+        top: 0;
+        left: 0;
+        transform: scale(0.75);
+        transform-origin: top left;
+      }
+    </style>
+  </head>
+  <body>
+    <div><i> View the source for this page to see how copying works.</i></div>
+
+    <!-- Example Puzzle with crossword -->
+    <div id="puzzle-contents-copyable">
+      <h3>Crossword Example</h3>
+      <!-- Google Sheets doesn't reset formatting (though Chrome's copy
+        function will insert styles on every element), so insert a dummy
+        element after the bold -->
+      <span style="
+        color: black;
+        font-weight: normal;
+        font-style: normal;
+        font-size: 1em;
+        "></span>
+      <div><i>Here's a crossword!</i></div>
+      <!-- And again after the italics -->
+      <span style="
+        color: black;
+        font-weight: normal;
+        font-style: normal;
+        font-size: 1em;
+        "></span>
+
+
+      <!-- Example Grid -->
+      <table>
+        <tbody>
+          <tr>
+            <!-- styles must be inline or else they won't copy in Firefox -->
+            <td style="border:1px solid black"><div class="number">1</div></td>
+            <td style="border:1px solid black"><div class="number">2</div></td>
+            <td style="background-color: black; border:1px solid black"></td>
+          </tr>
+          <tr>
+            <td style="border:1px solid black"><div class="number">3</div></td>
+            <td style="border:1px solid black"></td>
+            <td style="border:1px solid black"><div class="number">4</div></td>
+          </tr>
+          <tr>
+            <td style="background-color: black; border:1px solid black"></td>
+            <td style="border:1px solid black"><div class="number">5</div></td>
+            <td style="border:1px solid black"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- More Stuff -->
+      <h4>Across</h4>
+      <!-- dummy element to reset style after bold -->
+      <span style="
+        color: black;
+        font-weight: normal;
+        font-style: normal;
+        font-size: 1em;
+        "></span>
+      <ol>
+        <li value="1">
+          <!-- HTML will format the list item, but we want it to copy too. -->
+          <span class="clipboard-only">1. </span>
+          Prof's aide
+        </li>
+        <li value="3">
+          <span class="clipboard-only">3. </span>
+          Prankster
+        </li>
+        <li value="5">
+          <span class="clipboard-only">5. </span>
+          Enlightened response
+        </li>
+      </ol>
+
+      <h4>Down</h4>
+      <!-- dummy element to reset style after bold -->
+      <span style="
+        color: black;
+        font-weight: normal;
+        font-style: normal;
+        font-size: 1em;
+        "></span>
+
+      <ol>
+        <li value="1">
+          <!-- HTML list item does not get copied, so insert our own. -->
+          <span class="clipboard-only">1. </span>
+          La follower
+        </li>
+        <li value="2">
+          <span class="clipboard-only">2. </span>
+          Modern Q&amp;A inits
+        </li>
+        <li value="4">
+          <span class="clipboard-only">4. </span>
+          Acidity scale
+        </li>
+      </ol>
+
+      <div class="no-copy">Here's some text that won't get copied.</div>
+
+      <!-- Barred Grid -->
+      <h3>Barred Grid Example</h3>
+      <!-- dummy element to reset style after bold -->
+      <span style="
+        color: black;
+        font-weight: normal;
+        font-style: normal;
+        font-size: 1em;
+        "></span>
+      <div>Here's another grid with more unique borders.</div>
+      <table>
+        <tbody>
+          <tr>
+            <!-- Google Sheets does not handle borders on all four sides that
+              are not the same. You can specify different borders on different
+              sides with border-top border-right border-bottom border-left as
+              long as at least one of them is not set. -->
+            <td style="
+              border-top: 1px solid black;
+              border-right: 2px solid black;
+              border-left: 1px solid black;
+              "></td>
+            <td style="
+              border-top: 1px solid black;
+              border-left: 2px solid black;
+              "></td>
+            <td style="
+              border-top: 1px solid black;
+              border-right: 1px solid black;
+              "></td>
+          </tr>
+            <td style="
+              border-left: 1px solid black;
+              "></td>
+            <td style=""></td>
+            <td style="
+              border-right: 1px solid black;
+              "></td>
+          <tr>
+            <td style="
+              border-bottom: 1px solid black;
+              border-left: 1px solid black;
+              "></td>
+            <td style="
+              border-right: 2px solid black;
+              border-bottom: 1px solid black;
+              "></td>
+            <td style="
+              border-right: 1px solid black;
+              border-bottom: 1px solid black;
+              border-left: 2px solid black;
+              "></td>
+          </tr>
+          <tr>
+          </tr>
+        </tbody>
+      </table>
+
+    </div>
+
+    <!-- END EXAMPLE PUZZLE CODE -->
+
+    <!-- Hidden textarea to store contents to copy-to-clipboard -->
+    <textarea id="clipboard-contents" readOnly></textarea>
+
+    <!-- Button to copy-to-clipboard when clicked -->
+    <button id="clipboard-button">
+      <div>
+        <!-- We recommend using Twemoji or similar for unicode characters (but
+          don't want to complicate this example) -->
+        📋 <span id="clipboard-message">Copy to clipboard</span>
+      </div>
+    </button>
+    <!-- Teammate Hunt had a React tooltip, as well as a collapsible animation,
+      but we've stripped React from this example to reduce complexity. -->
+  </body>
+
+  <!-- Load jQuery -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+  <!-- Code for copy-to-clipboard -->
+  <script type="text/javascript">
+    const CLIPBOARD_ONLY_CLASS = 'clipboard-only';
+    const NO_COPY_CLASS = 'no-copy';
+
+    const setMessage = (text) => {
+      let messageElement = document.getElementById("clipboard-message");
+      messageElement.textContent = text;
+    }
+
+    const copyContentsText = (text) => copyContents(
+      {copyableText: text});
+
+    const copyContentsById = (id) => copyContents(
+      {copyableElement: document.getElementById(id)});
+
+    const copyContents = async ({ copyableText, copyableElement }) => {
+      const textareaElement = document.getElementById("clipboard-contents");
+      const buttonElement = document.getElementById("clipboard-button");
+      // Use \r\n for Windows compatibility
+      copyableText = Array.isArray(copyableText) ? copyableText.join("\r\n") : copyableText;
+      if ("navigator" in window && navigator.clipboard && copyableText) {
+        // Modern navigator API, supports writing text.
+        await navigator.clipboard.writeText(copyableText);
+        setMessage("Copied to clipboard!");
+      } else if (textareaElement) {
+        // Fallback if navigator API is not supported in older browsers, or if
+        // we need to copy actual HTML.
+        if (copyableElement) {
+          // Temporarily unhide any invisible elements.
+          $(copyableElement).find(`.${CLIPBOARD_ONLY_CLASS}`).show();
+          $(copyableElement).find(`.${NO_COPY_CLASS}`).hide();
+          // Handle the selection.
+          if (window.getSelection()) window.getSelection().removeAllRanges();
+          const range = document.createRange();
+          range.selectNode(copyableElement);
+          if (window.getSelection()) window.getSelection().addRange(range);
+          // Hide the button or else will copy itself too
+          if (buttonElement) $(buttonElement).hide();
+          // Command to do the copying
+          document.execCommand("copy");
+          // Show the button again.
+          if (buttonElement) $(buttonElement).show();
+          // Hide invisible elements again.
+          $(copyableElement).find(`.${CLIPBOARD_ONLY_CLASS}`).hide();
+          $(copyableElement).find(`.${NO_COPY_CLASS}`).show();
+        } else {
+          // Temporarily show the textarea so it can be copied.
+          textareaElement.current.style.display = "block";
+          textareaElement.current.select();
+          if (buttonElement) $(buttonElement).hide();
+          document.execCommand("copy");
+          if (buttonElement) $(buttonElement).show();
+          textareaElement.current.style.display = "none";
+        }
+        if (window.getSelection()) window.getSelection().removeAllRanges();
+        setMessage("Copied to clipboard!");
+      } else {
+        setMessage(
+          "Failed to copy to clipboard! Please contact us if you see this error."
+        );
+        return;
+      }
+      setTimeout(() => void setMessage("Copy to Clipboard"), 3000);
+    };
+
+    // Set up event handler to call copy function when the button is clicked
+    document.getElementById("clipboard-button").addEventListener(
+      "click", () => copyContentsById("puzzle-contents-copyable"));
+    // Example where we only want to copy a plaintext (text/plain only, no
+    // text/html) string instead.
+    // document.getElementById("clipboard-button").addEventListener(
+    //   "click", () => copyContentsText("Plain text content to copy."));
+  </script>
+
+</html>

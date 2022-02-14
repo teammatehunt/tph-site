@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load puzzle_tags %}
+
+{% block page-title %}
+<title>Errata Email</title>
+{% endblock %}
+
+{% block content %}
+
+<h1>Emails We'll Send To</h1>
+
+<main>
+    <p>The email we send will look like this:</p>
+
+    <p><strong>Subject:</strong> Erratum issued for {{ errata.puzzle.name }}</p>
+
+    <p><strong>Body:</strong></p>
+
+    <div style="border: 1px solid black;">
+        {{ email_string }}
+    </div>
+
+    <p>It will be sent to the following emails:</p>
+</main>
+
+<ul>
+    {% for team, team_emails in emails %}
+        <li>Team: {{ team.team_name }}</li>
+        <ul>
+        {% for email in team_emails %}
+            <li>{{ email }} (Team: {{ team.team_name }})</li>
+        {% endfor %}
+        </ul>
+    {% endfor %}
+</ul>
+
+<form method="post">
+    {% csrf_token %}
+    <button class="btn" type="submit">Send the Emails (May Take a While, Please Wait...)</button>
+</form>
+
+{% endblock %}

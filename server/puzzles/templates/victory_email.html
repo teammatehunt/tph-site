@@ -1,0 +1,13 @@
+<p>Congratulations on completing the {{ hunt_title }}!</p>
+
+{% comment "FIXME: update logo and profile pic" %}
+{% if profile_pic %}
+    <img style="display:block;margin-left:auto;margin-right:auto;" src="https://mypuzzlehunt.com/media/{{profile_pic}}" alt="your team's profile picture">
+{% else %}
+    <img style="display:block;margin-left:auto;margin-right:auto;" src="https://mypuzzlehunt.com/logo.png" alt="my puzzlehunt logo">
+{% endif %}
+{% endcomment %}
+
+<p>Thank you for helping (FIXME story reason), {{ team_name }}. Before you go, we would love to hear your <a href="https://forms.gle/FIXME">feedback on the hunt</a>. Thanks for solving our puzzles!</p>
+
+<p>- {{ hunt_organizers }}</p>

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% block page-title %}
+<title>Email</title>
+{% endblock %}
+
+<h1>Email</h1>
+
+<main>
+    <p{% if request.context.num_unsent_emails %} class="bold"{% endif %}><a href="{% url 'resend-emails' %}">Unsent emails{% if request.context.num_unsent_emails %} ({{ request.context.num_unsent_emails }}){% endif %}</a></p>
+    <p><a href="{% url 'errata-list' %}">Send email for errata</a></p>
+    <p><a href="{% url 'all-emails' %}">Get all emails for hunt-wide announcements (write email yourself)</a></p>
+    <p><a href="{% url 'custom-email' %}">Send hunt-wide announcement (create email and send through site)</a></p>
+</main>
+
+{% endblock %}

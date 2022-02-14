@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -e
+REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
+cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
+
+# This script relies on id, tput, and stty which are hopefully portable.
+# We might need to update this to have portability on Windows.
+
+# TODO: propagate prettier and black errors to this script's return code (matters if we want to put this in a pre-commit hook)
+
+STTY_SETTINGS=$(stty -g)
+if $(docker-compose exec tph bash -c '[[ "$SERVER_ENVIRONMENT" == dev ]]')
+then
+  # run prettier and black in parallel
+  # prettier messes with stty settings so we make sure to restore them
+  cat \
+    <(tput bold && tput setaf 6 && echo 'Running prettier' && tput sgr0 && docker-compose exec -w /app -u "$(id -u):$(id -g)" tph prettier --write '**/*.tsx' ; stty ${STTY_SETTINGS}) \
+    <(echo) \
+    <(tput bold && tput setaf 6 && echo 'Running black' && tput sgr0 && docker-compose exec -w /app -u "$(id -u):$(id -g)" tph black .)
+else
+  >&2 echo Error: Is the dev environment running?
+  exit 1
+fi

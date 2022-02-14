@@ -1,0 +1,24 @@
+version: '3.7'
+
+services:
+  tph:
+    build:
+      context: .
+      target: output_dev
+    environment:
+      - SERVER_ENVIRONMENT=dev
+      - SERVER_HOSTNAME=localhost
+    ports:
+      - '127.0.0.1:8080:80'
+      - '127.0.0.1:8081:443'
+    volumes:
+      - .:/app # rw on dev
+      - /app/client/node_modules # ignore host node_modules
+      - /app/client/.next # ignore host .next
+      - ./client/.docker.yarnrc:/app/client/.yarnrc:ro
+      - srv_dev:/srv
+      - ./deploy/Caddyfile.dev:/Caddyfile:ro
+      - ./deploy/supervisord.dev.conf:/etc/supervisord.conf:ro
+
+volumes:
+  srv_dev:

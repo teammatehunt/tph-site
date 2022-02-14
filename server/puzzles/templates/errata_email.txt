@@ -1,0 +1,5 @@
+{% autoescape off %}
+An erratum was issued for the puzzle {{ errata.puzzle }}.
+
+Erratum: {{ errata.text }}
+{% endautoescape %}

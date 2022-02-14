@@ -1,0 +1,5 @@
+{% autoescape off %}
+Your request for more guesses on the puzzle {{ guess_grant.puzzle }} has been fulfilled.
+
+In total, you should have {{ guess_grant.extra_guesses }} additional guesses.
+{% endautoescape %}

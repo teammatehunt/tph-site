@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -e
+REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
+cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
+
+# Show caddy logs with updates. Optional argument to set number of lines to look back on start.
+docker-compose exec tph sh -c "tail -f -n \"${1:-50}\" /srv/logs/*"

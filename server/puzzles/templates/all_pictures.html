@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load puzzle_tags %{
+
+{% block top-left-actions %}
+{% if hunt_is_over %}
+  <a href="/wrapup" class="btn">Back to wrap-up</a>
+{% endif %}
+{% endblock %}
+
+{% block page-title %}
+<title>All Profile Pictures</title>
+{% endblock %}
+
+{% block content %}
+<h1>All Profile Pictures</h1>
+
+<main>
+    <p>These teams are listed in order of the leaderboard. Only teams with an uploaded picture appear here.</p>
+
+    <table>
+        <tr>
+            <th style="width: 10%">Team</th>
+            <th style="width: 45%">Profile Pic</th>
+            <th style="width: 45%">Victory Profile Pic</th>
+        </tr>
+    {% for team, profile, victory in teams_with_pics %}
+        <tr>
+          <td>{{ team.team_name }}</td>
+            <td><img loading="lazy" src="{{ profile }}"></td>
+            <td><img loading="lazy" src="{{ victory }}"></td>
+        </tr>
+    {% endfor %}
+    </table>
+</main>
+
+<style>
+  img {
+    width: 100%;
+  }
+</style>
+
+{% endblock %}

@@ -1,0 +1,17 @@
+# This docker compose override file is used to build and start a staging environment locally
+version: '3.7'
+
+services:
+  tph:
+    build: .
+    environment:
+      - SERVER_ENVIRONMENT=staging
+      - SERVER_HOSTNAME=localhost
+    ports:
+      - '127.0.0.1:8080:80'
+      - '127.0.0.1:8081:443'
+    volumes:
+      - srv:/srv
+
+volumes:
+  srv:

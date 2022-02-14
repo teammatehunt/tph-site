@@ -1,0 +1,13 @@
+# This docker compose override file is used for Gitlab CI deployments
+version: '3.7'
+
+services:
+  tph:
+    image: ${IMAGE_TAG}
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - '${SERVER_HTTP_BIND_PREFIX}080:80'
+      - '${SERVER_HTTP_BIND_PREFIX}443:443'
+    volumes:
+      - ${HOME}/srv:/srv

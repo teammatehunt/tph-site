@@ -1,0 +1,5 @@
+<p>Your hint question for the puzzle <b>{{ hint_response.puzzle }}</b> has been <a href="{{ hint_response.puzzle_hint_url }}">answered</a>.</p>
+
+{% if hint_request %}<p><b>Question</b>:<br>{{ hint_request.text_content|linebreaksbr }}</p>
+{% endif %}
+<p><b>Response</b>:<br>{{ hint_response.text_content|linebreaksbr }}</p>

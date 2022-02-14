@@ -1,0 +1,110 @@
+{% load puzzle_tags %}
+{% load humanize %}
+{% load static %}
+
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    {% block page-title %}
+    <title>FIXME Hunt</title>
+    {% endblock %}
+    <meta name="viewport" content="width=device-width, initial-scale=0.5">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="{% static "css/skeleton.css" %}">
+    <link rel="stylesheet" href="{% static "css/base.css" %}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.touchswipe/1.6.19/jquery.touchSwipe.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.formset/1.2.2/jquery.formset.min.js"></script>
+    <script src="{% static "js/sorttable.js" %}"></script>
+    <script src="{% static "js/tray.js" %}"></script>
+    {% block favicon %}
+    <link rel="shortcut icon" sizes="16x16 32x32 48x48 64x64" href="/favicon.ico" type="image/vnd.microsoft.icon">
+    {% endblock %}
+</head>
+<body>
+    <nav>
+        <span class="tray">
+            <div class="top-tabs">
+                {% if hunt_is_over or is_superuser %}
+                  <a href="{% url 'bigboard' %}">Bigboard</a>
+                  <a href="{% url 'finishers' %}">Finishers</a>
+                  <a href="{% url 'hunt-stats' %}">Hunt Stats</a>
+                  <a href="{% url 'all-pictures' %}">Profile Pics</a>
+                {% endif %}
+
+                {% if is_superuser %}
+                  {% with num_unclaimed_hints=request.context.num_unclaimed_hints num_unclaimed_emails=request.context.num_unclaimed_emails num_unsent_emails=request.context.num_unsent_emails %}
+                  <a href="{% url 'hint-list' %}">
+                      Hints
+                      {% if num_unclaimed_hints %}
+                      <span class="circled">{{ num_unclaimed_hints }}</span>
+                      {% endif %}
+                  </a>
+                  <a href="{% url 'unanswered-email-list' %}">
+                      Emails
+                      {% if num_unclaimed_emails %}
+                      <span class="circled">{{ num_unclaimed_emails }}</span>
+                      {% endif %}
+                  </a>
+                  <a href="{% url 'email-main' %}">
+                      Send Email
+                      {% if num_unsent_emails %}
+                      <span class="circled">{{ num_unsent_emails }}</span>
+                      {% endif %}
+                  </a>
+                  <a href="/admin">Admin</a>
+                  {% endwith %}
+                {% endif %}
+            </div>
+            <div class="top-left-actions">
+                {% block top-left-actions %}{% endblock %}
+            </div>
+        </span>
+        <div class="top-right-actions">
+        </div>
+    </nav>
+    {% if is_superuser %}
+    <main class="shortcuts">
+        <form method="post" action="FIXME" target="dummy">
+            {% csrf_token %}
+            {% for shortcut in shortcuts %}
+            {% if 'action' in shortcut %}
+            <button class="btn" type="submit" name="action" value="{{ shortcut.action }}">{{ shortcut.name }}</button>
+            {% else %}
+            <div>{{ shortcut.name }}</div>
+            {% endif %}
+            {% endfor %}
+            <div>Download logs</div>
+            <a class="btn" href="FIXME">Guess</button></a>
+            <a class="btn" href="FIXME">Hint</button></a>
+            <a class="btn" href="FIXME">Puzzle</button></a>
+            {% if puzzle %}
+            <input name="puzzle" value="{{ puzzle.slug }}" type="hidden">
+            {% endif %}
+            <iframe src="about:blank" name="dummy" style="display: none"></iframe>
+        </form>
+    </main>
+    {% endif %}
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+    {% if messages %}
+    <script>
+    {% for message in messages %}
+        {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
+        toastr.error("{{ message|escapejs }}");
+        {% elif message.level == DEFAULT_MESSAGE_LEVELS.WARNING %}
+        toastr.warning("{{ message|escapejs }}");
+        {% elif message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
+        toastr.success("{{ message|escapejs }}");
+        {% else %}
+        toastr.info("{{ message|escapejs }}");
+        {% endif %}
+    {% endfor %}
+    </script>
+    {% endif %}
+</body>
+</html>

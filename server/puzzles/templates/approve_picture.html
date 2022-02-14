@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block page-title %}
+<title>Approve Picture?</title>
+{% endblock %}
+
+{% block content %}
+
+{% if picture %}
+    {{ team_name }}'s team photo.
+    <br />
+    <img src="{{ picture }}" />
+
+    <p>
+    {% if approved %}
+        Team photo is already approved. Do you want to unapprove this photo?
+        <form method="post">
+            <button class="btn" type="submit" name="no">Unapprove</button>
+        </form>
+    {% else %}
+        Approve?
+        <form method="post">
+            <button class="btn" type="submit" name="yes">Yes</button>
+            <button class="btn" type="submit" name="no">No</button>
+        </form>
+    {% endif %}
+    </p>
+{% else %}
+    {{ team_name }} does not have a team photo.
+{% endif %}
+
+{% endblock %}

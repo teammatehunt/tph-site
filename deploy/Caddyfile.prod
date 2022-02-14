@@ -1,0 +1,145 @@
+# vim: filetype=caddyfile
+
+{
+    storage file_system {
+        root /srv
+    }
+}
+
+# snippet to serve files after checking auth
+(serve) {
+    # matchers are defined prior to snippet
+
+    route {
+        reverse_proxy @django       localhost:8000
+
+        # blocked resources should return 404 instead
+        respond @blocked 404
+
+        header @team_media {
+            # Don't let proxies transform or compress team pictures
+            Cache-Control "no-transform"
+        }
+        header @site_media {
+            # Site media should have uuids (but this is not enforced)
+            # cache for 2 weeks
+            Cache-Control "public, max-age=1209600"
+        }
+        file_server @media {
+            root /srv # these are user-uploaded media and are persisted at /srv/media
+        }
+        header @static_immutable {
+            # cache for 2 weeks
+            Cache-Control "public, max-age=1209600, immutable"
+        }
+        file_server @static {
+            root /static # these are generated and collected static files at /static
+            precompressed br gzip # needs Caddy v2
+        }
+
+        # proxy everything else to the frontend on port 3000
+        reverse_proxy               localhost:3000
+    }
+}
+
+
+# server configuration
+{$CADDY_PROTOCOL}{$SERVER_HOSTNAME} {
+    log {
+        output file /srv/logs/caddy.log
+    }
+
+    encode zstd gzip
+
+    @static {
+        file {
+            root /static
+        }
+        path /static/*
+        path /_next/static/*
+
+        # static files at root
+        path /banner.png
+        path /favicon.ico
+        path /logo.png
+        path /sorttable.js
+        path /worker.js
+        path /pyodide/*
+    }
+
+    # versioned and hashed files are immutable
+    @static_immutable {
+        path /static/*
+        path /_next/static/*
+        path /pyodide/*
+    }
+
+    # matchers
+
+    @django_admin {
+        path /admin
+        path /admin/*
+        path /impersonate/*
+        path /internal
+        path /internal/*
+        path /huntinfo/*
+    }
+
+    # TODO: we may want to hide things like certain API endpoints as well
+    @needs_check {
+        path /puzzles/*
+        path /hints/*
+        path /solutions/*
+        path /internal_frontend/*
+        path /_next/static/assets/solution/*
+        path /_next/static/assets/victory/*
+        path /victory
+    }
+
+    @django {
+        path /api/*
+        path /ws/*
+        path /clipboard
+    }
+
+    @media {
+        file {
+            root /srv
+        }
+        path /media/*
+    }
+    @team_media {
+        # team related media like profile pictures
+        file {
+            root /srv
+        }
+        path /media/team/*
+    }
+    @site_media {
+        # static site media like puzzle icons and storycard images
+        file {
+            root /srv
+        }
+        path /media/site/*
+    }
+
+    @blocked {
+        path /static/staticfiles.json
+    }
+
+    # `route` prevents Caddy from reordering the directives under it
+    route {
+        reverse_proxy @django_admin localhost:8000
+        route @needs_check {
+            rewrite * /check{path}
+            reverse_proxy localhost:8000 {
+                @accel header X-Accel-Redirect *
+                handle_response @accel {
+                    rewrite * {http.reverse_proxy.header.X-Accel-Redirect}
+                    import serve
+                }
+            }
+        }
+        import serve
+    }
+}

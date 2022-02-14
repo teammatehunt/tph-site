@@ -1,0 +1,346 @@
+/* Variables for intro round */
+/* Override these variables with colors for main rounds */
+/* FIXME: choose a new font and styles */
+:root {
+  --background: #fffcdf;
+  --background-transparent: rgba(255, 252, 223, 0.5);
+  --background-dark: #fbf1cb;
+  --navbar: var(--dark-translucent);
+  --dark: #fffcdf;
+  --dark-translucent: rgba(255, 252, 223, 0.9);
+  --dark-transparent: rgba(255, 252, 223, 0);
+  --fade-gradient: linear-gradient(
+    180deg,
+    var(--navbar) 0%,
+    var(--dark-transparent) 100%
+  );
+  --theme-translucent: rgba(255, 255, 255, 0.8);
+  --text: #403a1e;
+  --primary: #00068a;
+  --secondary: #ff5b5b;
+  --white: #fff;
+  --black: #000;
+  --red: #ff5b5b;
+  --yellow: #dec57d;
+  --muted: #ccc;
+  --title-font: 'Sandorian';
+  --text-font: 'Vollkorn';
+  --sc-font: 'Vollkorn SC';
+  --mono-font: 'DM Mono';
+}
+
+h1 {
+  font-family: var(--title-font), serif;
+  font-size: min(160px, 12vh);
+  font-weight: normal;
+  line-height: min(168px, 12vh);
+  letter-spacing: 0.02em;
+  color: var(--primary);
+  text-shadow: 4px 4px 0px rgba(0, 6, 138, 0.25);
+  text-transform: lowercase;
+  margin-bottom: 0.01em;
+  word-wrap: break-word;
+}
+
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--text-font), serif;
+  color: var(--primary);
+}
+
+body {
+  /* background image in layout.tsx, not sure if we can load assets in .css files */
+  background-color: var(--background);
+  background-attachment: fixed, fixed;
+  margin: 0;
+
+  font-family: var(--text-font), serif;
+  font-size: 1rem;
+  font-variant-numeric: lining-nums;
+  color: var(--text);
+}
+
+html {
+  box-sizing: border-box;
+}
+*,
+*:before,
+*:after {
+  box-sizing: inherit;
+}
+
+h2 {
+  font-size: 40px;
+}
+
+h3 {
+  font-size: 24px;
+  margin: 20px 0;
+}
+
+h4 {
+  font-size: 20px;
+}
+
+h5 {
+  font-size: 16px;
+}
+
+h6 {
+  font-size: 14px;
+}
+
+.right {
+  float: right;
+}
+
+.center {
+  text-align: center;
+}
+
+.abs-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+}
+
+.flex-center-vert {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.monospace {
+  font-family: var(--mono-font), monospace;
+}
+
+img.centerimg {
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+}
+
+table.centertable {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.formerror {
+  color: var(--secondary);
+  font-size: 14px;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.primary {
+  color: var(--primary);
+}
+
+.error {
+  color: var(--secondary);
+}
+
+.white {
+  color: var(--white);
+}
+
+.black {
+  color: var(--black);
+}
+
+.yellow {
+  color: var(--yellow);
+}
+
+input {
+  background: transparent;
+  border: 1px solid var(--text);
+  color: var(--text);
+}
+
+button,
+input[type='submit'] {
+  background: var(--text);
+  border: 1px solid var(--text);
+  color: var(--background);
+  font-family: var(--text-font), serif;
+}
+
+input[type='submit']:disabled {
+  background: var(--muted);
+  border-color: var(--muted);
+}
+
+button:not([disabled]):hover,
+input[type='submit']:not([disabled]):hover,
+input[type='button']:not([disabled]):hover {
+  opacity: 0.8;
+  cursor: pointer;
+}
+
+a {
+  color: var(--primary);
+  text-underline-offset: 4px;
+}
+
+/* Always underline and show pointer even if no href set. */
+a {
+  text-decoration: underline;
+}
+
+a:hover {
+  cursor: pointer;
+}
+
+.bg-red {
+  background: #c33;
+}
+
+.bg-pink {
+  background: lightpink;
+}
+
+.bg-green {
+  background: #3c3;
+}
+
+.bg-darkgreen {
+  background: #003d07;
+}
+
+.bg-black {
+  background: #000;
+}
+
+.bg-darkblue {
+  background: #0b264a;
+}
+
+.bg-lightblue {
+  /* TODO: refine this */
+  background: lightblue;
+}
+
+.bg-yellow {
+  background: #ffd59b;
+}
+
+.bg-darkyellow {
+  background: #f3d573;
+}
+
+.bg-orange {
+  background: orange;
+}
+
+.bg-pink {
+  background: lightpink;
+}
+
+.bg-grey {
+  background: darkgrey;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.col-50 {
+  flex: 50%;
+}
+
+.truncate {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+table {
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+table:not(.center) th:not(.center) {
+  text-align: left;
+}
+
+table.center td {
+  text-align: center;
+}
+
+table.bordered th,
+table.bordered td {
+  border: 1px solid black;
+  padding: 8px 20px;
+}
+
+@media (max-width: 550px) {
+  .collapse {
+    flex: 100%;
+  }
+}
+
+.hidden,
+.copy-only {
+  display: none;
+}
+
+.spoiler {
+  background: var(--black);
+  border-radius: 4px;
+  padding: 0 4px;
+  transition: all 300ms ease-in-out;
+}
+
+.spoiler:not(:hover) {
+  color: var(--black);
+}
+
+.spoiler:hover,
+.spoiler:focus {
+  background: rgba(0, 0, 0, 0);
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-bold {
+  font-weight: bold;
+}
+
+.secondary {
+  color: var(--secondary);
+}
+
+.small-caps {
+  font-family: var(--sc-font);
+}
+
+/* Fix wrapping issues on smaller devices */
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+@media (min-width: 550px) {
+  .hide-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

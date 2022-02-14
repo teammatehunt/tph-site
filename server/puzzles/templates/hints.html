@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block page-title %}
+<title>Hints: {{ puzzle.name }}</title>
+{% endblock %}
+
+{% block top-left-actions %}
+{% endblock %}
+
+{% block content %}
+
+<style>
+label {
+    text-align: left;
+}
+
+.nr, .obs {
+    color: #999;
+}
+</style>
+
+<h1>Debug Hint Page</h1>
+
+<p>This adds a hint for a sample puzzle, for the admin team.</p>
+
+<main>
+    <h4>Request a hint</h4>
+
+    <form method="post" class="call-in-answer-panel">
+        {% csrf_token %}
+
+        {{ form.non_field_errors }}
+
+        {% for field in form %}
+        <div class="row">{{ field.label_tag }}</div>
+        <div class="row">{{ field }} {{ field.errors }}</div>
+        {% endfor %}
+        <div class="row">
+            <button class="btn" type="submit">Submit</button>
+        </div>
+    </form>
+</main>
+
+{% endblock %}

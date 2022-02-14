@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load puzzle_tags %}
+
+{% block top-left-actions %}
+{% if hunt_is_over %}
+  <a href="/wrapup" class="btn">Back to wrap-up</a>
+{% endif %}
+{% endblock %}
+
+{% block page-title %}
+<title>FIXME Hunt Finishers</title>
+{% endblock %}
+
+{% block content %}
+
+<style>
+td {
+    border: none;
+}
+
+.chart {
+    width: 100%;
+    height: 82px;
+    background-color: rgba(180, 160, 140, 0.3);
+    transform: scaleY(-1);
+}
+
+.area {
+    fill: rgb(180, 220, 150);
+}
+
+.bar {
+    stroke: rgba(248, 188, 78, 0.5);
+    stroke-width: 0.5%;
+    fill: none;
+}
+
+.sorting [colspan] {
+    display: none;
+}
+</style>
+
+<h1>Finishers</h1>
+
+<main>
+<table class="sortable gph-list-table">
+    <col style="width: 40%">
+    <col style="width: 15%">
+    <col style="width: 15%">
+    <col style="width: 15%">
+    <tr onclick="document.querySelector('tbody').className = 'sorting'">
+        <th>Team</th>
+        <th>Final meta unlock (EDT)</th>
+        <th>Time to solve<br>after unlock</th>
+        <th>Final meta solve (EDT)</th>
+    </tr>
+    {% for team in data %}
+    <tr>
+        <td><a href="/team/{{ team.team.team_name|urlencode:"" }}">
+            {{ team.team.team_name }}
+        </a></td>
+        <td sorttable_customkey="{{ team.mm1_time|unix_time }}">
+            {% format_time team.mm1_time %}
+        </td>
+        <td sorttable_customkey="{{ team.duration }}">
+            {% format_duration team.duration %}
+        </td>
+        <td sorttable_customkey="{{ team.mm2_time|unix_time }}">
+            {% format_time team.mm2_time %}
+        </td>
+    </tr>
+    {% if is_superuser %}
+    <tr>
+        <td colspan="4">
+            <tt>{{ team.team.get_emails|join:', ' }}</tt>
+        </td>
+    </tr>
+    {% endif %}
+    <tr>
+        <td colspan="4">
+            <svg class="chart" viewbox="0 0 {{ team.hunt_length }} 41" preserveAspectRatio="none">
+                <path d="M {{ team.hunt_length }} 0 L 0 0
+                {% for solve in team.solves %}
+                L {{ solve.before }} {{ forloop.counter }}
+                L {{ solve.after }} {{ forloop.counter }}
+                {% endfor %}
+                " class="area"></path>
+                {% for meta in team.metas %}
+                <path d="M {{ meta }} 0 L {{ meta }} 41" class="bar"></path>
+                {% endfor %}
+            </svg>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+</main>
+
+{% endblock %}

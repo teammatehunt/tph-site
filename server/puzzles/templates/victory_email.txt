@@ -1,0 +1,9 @@
+{% autoescape off %}
+
+Congratulations on completing the {{ hunt_title }}!
+
+Thank you for helping (FIXME story reason), {{ team_name }}. Before you go, we would love to hear your feedback on the hunt (FIXME). Thanks for solving our puzzles!
+
+- {{ hunt_organizers }}
+
+{% endautoescape %}

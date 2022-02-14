@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load puzzle_tags %}
+
+{% block page-title %}
+<title>Resend Emails</title>
+{% endblock %}
+
+{% block content %}
+
+<h1>Unsent Emails</h1>
+
+<div>
+    <script type="text/javascript">
+        function togglePks(e) {
+            let checkboxes = document.getElementsByName("pks");
+            for (let i=0; i<checkboxes.length; i++) {
+                checkboxes[i].checked = e.checked;
+            }
+        }
+    </script>
+</div>
+
+<main>
+    <form method="post">
+        {% csrf_token %}
+        <table class="request-table">
+            <tr>
+                <th><input type="checkbox" onclick="togglePks(this)"></th>
+                <th>Email</th>
+                <th></th>
+                <th><button class="btn" name="action" value="submit" type="submit">Resend</button></th>
+            </tr>
+            {% for email in unsent_emails %}
+            <tr>
+                <td><input type="checkbox" name="pks" value="{{ email.pk }}"></td>
+                <td>
+                    <a href="{% url "email" email.pk %}">
+                        {{ email.subject }}
+                    </a>
+                </td>
+                <td>
+                    {{ email.scheduled_datetime }}
+                </td>
+                <td>
+                    {{ email.all_recipients }}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </form>
+</main>
+
+{% endblock %}

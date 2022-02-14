@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load puzzle_tags %}
+
+{% block page-title %}
+<title>Emails Sent</title>
+{% endblock %}
+
+{% block content %}
+
+<main>
+    <p>The emails have been scheduled. If you are really suspicious, you can check the Admin site, under Emails.</p>
+
+    <p><a href="{% url 'email-main' %}">Back to Email</a></p>
+</main>
+
+{% endblock %}

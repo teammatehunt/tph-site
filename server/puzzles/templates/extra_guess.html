@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load puzzle_tags %}
+
+{% block page-title %}
+<title>Extra Guesses: {{ guess_grant.team.team_name }} wants guesses on {{ guess_grant.puzzle }}</title>
+{% endblock %}
+
+{% block content %}
+
+<h1>Grant Extra Guesses</h1>
+
+<main>
+    <a href="/team/{{ guess_grant.team.team_name|urlencode:"" }}">{{ guess_grant.team }}</a>
+    has requested more guesses on
+    <a href="/puzzles/{{ guess_grant.puzzle.slug }}">{{ guess_grant.puzzle }}</a>
+    <p>They've made {{ ratelimit.guessesMade | length }} guesses in the past 24 hours.</p>
+    <p>
+        Rate limit expires in:
+        {% if ratelimit.shouldLimit %}
+            <span id="fill-by-js"></span>
+            <script>
+                var start = new Date('{{ ratelimit.countdownDate.isoformat }}');
+                function setTime() {
+                    var diff = (start - new Date) / 1000;
+                    if (diff < 0) {
+                        diff = 0;
+                    }
+                    var hr = diff / 3600 | 0;
+                    var min = (diff - 3600 * hr) / 60 | 0;
+                    if (min < 10) {
+                        min = '0' + min;
+                    }
+                    var sec = (diff - 3600 * hr - 60 * min) % 60 | 0;
+                    if (sec < 10) {
+                        sec = '0' + sec;
+                    }
+                    document.getElementById('fill-by-js').textContent = hr + ' hours, ' + min + ' minutes, ' + sec + ' seconds';
+                };
+                setTime();
+                setInterval(setTime, 1000);
+            </script>
+        {% else %}
+            N/A, no rate limit on team.
+        {% endif %}
+    </p>
+    <h4>Guesses for this puzzle from the past 24 hours</h4>
+    <ul>
+    {% for guess in ratelimit.guessesMade %}
+        <li>{{ guess }}</li>
+    {% endfor %}
+    </ul>
+    {{ form.non_field_errors }}
+    <form method="post" class="call-in-answer-panel request-controls">
+        {% csrf_token %}
+        {% if guess_grant.status == "NR" %}
+            <p>Grant extra guesses?</p>
+            <button class="btn" type="submit" name="yes">Yes</button>
+            <button class="btn" type="submit" name="no">No</button>
+            {% for field in form %}
+            <div>
+                <div class="two columns">{{ field.label_tag }}</div>
+                <div class="ten columns">{{ field }} {{ field.errors }}</div>
+            </div>
+            {% endfor %}
+        {% else %}
+        Already granted {{ guess_grant.extra_guesses }} more guesses. Revoke guess grant?
+            <button class="btn" type="submit" name="no">Revoke</button>
+        {% endif %}
+    </form>
+</main>
+
+{% endblock %}

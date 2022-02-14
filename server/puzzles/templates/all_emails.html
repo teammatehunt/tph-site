@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% block page-title %}
+<title>All Emails</title>
+{% endblock %}
+
+<h1>All Emails</h1>
+
+<main>
+    <p>These emails have been split into groups of 80, to avoid making the BCC list too large. Copy-paste each block into the BCC field, and wait a while between email sends.</p>
+
+    {% for chunk in email_chunks %}
+        <p style="word-wrap: anywhere;">
+            {{ chunk|join:"," }}
+        </p>
+    {% endfor %}
+</main>
+
+{% endblock %}

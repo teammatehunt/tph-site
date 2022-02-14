@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load puzzle_tags %}
+{% load humanize %}
+
+{% block page-title %}
+<title>Force Team Progress</title>
+{% endblock %}
+
+{% block top-left-actions %}
+{% endblock %}
+
+{% block content %}
+
+<style>
+body {
+    width: auto;
+    max-width: none;
+    margin: 0 5vw;
+}
+
+.bg {
+    display: none;
+}
+
+.content {
+    text-align: center;
+    font-size: 1.25rem;
+}
+
+table {
+    table-layout: fixed;
+}
+
+td, th {
+    padding: 0 0.3em;
+    line-height: 1.25;
+    white-space: nowrap;
+    min-width: 2.5em;
+    height: 2.5em;
+}
+
+td.U { {# unlocked #}
+    background-color: #888;
+}
+td.W { {# wrong #}
+    background-color: #aaa;
+}
+td.S { {# solved #}
+    background-color: #0D0;
+}
+td.b { {# backsolved from some metas #}
+    background-color: #282;
+}
+td.B { {# backsolved from all metas #}
+    background-color: #4a4;
+}
+td.F { {# free answer #}
+    background-color: #682;
+}
+td.H { {# hinted #}
+    background-image: linear-gradient(to bottom right, transparent 50%, #4f6a95 50%);
+}
+td.P { {# post-hunt solve #}
+    opacity: 0.5;
+}
+
+.end:not(:last-child) {
+    border-right: 1px solid #e1e1e1;
+}
+
+td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: bold;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    text-align: center;
+}
+
+table .hunt-icon {
+    width: 24px;
+}
+
+small {
+    display: block;
+}
+
+#hide {
+    width: 2rem;
+    height: 5rem;
+    margin: 0 1rem 0 0;
+    vertical-align: bottom;
+}
+
+[for=hide] {
+    display: inline-block;
+    font-size: 2rem;
+    line-height: 5rem;
+}
+
+:checked ~ table .finished {
+    display: none;
+}
+</style>
+
+<h1>Set Hunt Progress for {{ team_name }}</h1>
+
+<h2>This advances a team to different stages of the hunt. This overwrites
+    submissions and solves - only do it for testing teams!</h2>
+
+{% if setting %}
+    <p>Set {{ team_name }} to {{ setting }}<p>
+{% endif %}
+
+<form method="post">
+    <button class="btn" type="submit" name="hunt_start">Start of Hunt</button>
+    <button class="btn" type="submit" name="intro_meta_unlocked">Intro Meta Unlocked</button>
+    <button class="btn" type="submit" name="intro_meta_solved">Intro Meta Solved</button>
+</form>
+
+{% endblock %}

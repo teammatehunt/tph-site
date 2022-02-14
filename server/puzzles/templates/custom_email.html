@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load puzzle_tags %}
+
+{% block page-title %}
+<title>Create an Email</title>
+{% endblock %}
+
+{% block content %}
+
+<h1>Create an Email</h1>
+
+<main>
+    {% if subject %}
+        <p>Here is the email you are about to send to all teams.</p>
+
+        <p><strong>Subject:</strong> [FIXME Hunt] {{ subject }}</p>
+
+        <p>HTML version</p>
+        {% autoescape off %}
+        <div style="border: 1px solid black;">
+            {{ shown_html }}
+        </div>
+        {% endautoescape %}
+
+        <p>Plaintext version</p>
+        <pre style="border: 1px solid black; white-space: pre-wrap;">{{ shown_txt }}</pre>
+        <form method="post" class="call-in-answer-panel request-controls">
+            {% csrf_token %}
+            {% for field in form %}
+                <div>{{ field }} {{ field.errors }}</div>
+            {% endfor %}
+            <button class="btn" name="action" value="sendemail" type="submit">Send the Emails (May Take a While, Please wait...)</button>
+        </form>
+    {% else %}
+        <p>Enter both an HTML version and a plaintext version of the email you want
+        to send.</p>
+
+        <p><em>Note that the [FIXME Hunt] is automatically prepended to the email!</em></p>
+        <form method="post" class="call-in-answer-panel request-controls">
+            {% csrf_token %}
+            {% for field in form %}
+            <div>
+                <div class="two columns">{{ field.label_tag }}</div>
+                <div class="ten columns">{{ field }} {{ field.errors }}</div>
+            </div>
+            {% endfor %}
+            <button class="btn" name="action" value="html2text" type="submit">Populate text from html</button>
+            <button class="btn" name="action" value="showdraft" type="submit">Show Draft</button>
+        </form>
+    {% endif %}
+</main>
+
+{% endblock %}

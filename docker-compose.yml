@@ -1,0 +1,34 @@
+version: '3.7'
+
+services:
+  db:
+    image: postgres:13.2
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=makeSUREtoREPLACEthis
+  redis:
+    image: redis:6.2.1
+    restart: unless-stopped
+  tph:
+    # This is a dummy image name to allow `docker-compose` commands without
+    # specifying multiple compose files when the containers are already up.
+    # This is overridden in the specialized compose files.
+    image: tph
+    environment:
+      - SECRET_KEY=makeSUREtoREPLACEthis
+      - SMTP_PASSWORD=FIXME
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=makeSUREtoREPLACEthis
+      - REDIS_HOST=redis
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  pgdata:

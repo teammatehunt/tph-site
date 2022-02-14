@@ -1,0 +1,10 @@
+- model: auth.user
+  pk: 1
+  fields:
+    username: default
+- model: puzzles.team
+  pk: 1
+  fields:
+    user: 1
+    team_name: default
+    creation_time: 2021-10-01T23:00:00Z

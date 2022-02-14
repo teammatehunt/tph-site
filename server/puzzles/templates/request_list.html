@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% load puzzle_tags %}
+{% load static %}
+
+{% block page-title %}
+<title>
+    {% if is_hint %}
+        {% if request.context.num_unclaimed_hints %}
+            ({{ request.context.num_unclaimed_hints }})
+        {% endif %}
+    {% else %}
+        {% if request.context.num_unclaimed_emails %}
+            ({{ request.context.num_unclaimed_emails }})
+        {% endif %}
+    {% endif %}
+    {{ name | capfirst }}s
+</title>
+{% endblock %}
+
+{% block favicon %}
+    {% if is_hint %}
+        {% if request.context.num_unclaimed_hints %}
+            <link rel="shortcut icon" sizes="16x16 32x32 48x48 64x64" href="/z/favicon.ico" type="image/vnd.microsoft.icon">
+        {% else %}
+            <link rel="shortcut icon" sizes="16x16 32x32 48x48 64x64" href="/favicon.ico" type="image/vnd.microsoft.icon">
+        {% endif %}
+    {% else %}
+        {% if request.context.num_unclaimed_emails %}
+            <link rel="shortcut icon" sizes="16x16 32x32 48x48 64x64" href="/z/favicon.ico" type="image/vnd.microsoft.icon">
+        {% else %}
+            <link rel="shortcut icon" sizes="16x16 32x32 48x48 64x64" href="/favicon.ico" type="image/vnd.microsoft.icon">
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if name == "email" %}
+<div>
+    <a class="btn" href="?">Important{% if 'rest' in filters.unanswered_counts %} ({{ filters.unclaimed_counts.rest }}/{{ filters.unanswered_counts.rest }}){% endif %}</a>
+    <a class="btn" href="?spam=true">Spam{% if 'spam' in filters.unanswered_counts %} ({{ filters.unclaimed_counts.spam }}/{{ filters.unanswered_counts.spam }}){% endif %}</a>
+    {% for key in filters.to_filters %}
+    <a class="btn" href="?to={{ key }}">{{ key | title }}{% if key in filters.unanswered_counts %} ({{ filters.unclaimed_counts | get_item:key }}/{{ filters.unanswered_counts | get_item:key }}){% endif %}</a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h1>Open {% if spam %}Spam{% else %}{{ name | capfirst }}s{% endif %}</h1>
+
+<div class="request-controls">
+    <a class="btn" href="javascript:askName(true)">
+        Your name is <b id="claimer">{{ request.COOKIES.claimer | default:"anonymous" }}</b>.
+    </a>
+    {% if not is_hint %}
+    <a class="btn" href="javascript:askGmailUser(true)">
+        Your inbox number is <b id="gmail">{{ request.COOKIES.gmail | default:"unknown" }}</b>.
+    </a>
+    {% endif %}
+    <script src="{% static "js/hint.js" %}"></script>
+    {% if is_hint %}
+    <form action="/admin/puzzles/hint/" method="get">
+        <input placeholder="Search hints..." name="q">
+    </form>
+    {% endif %}
+</div>
+
+<main>
+    <table class="request-table">
+        {% for obj in unanswered %}
+        <tr>
+            <th>
+                <a href="{% url name obj.id %}">
+                    {% if obj.claimed_datetime %}
+                    Claimed {% duration_between obj.claimed_datetime now %} ago
+                    by {{ obj.claimer | default:"unknown" }}
+                    {% else %}
+                    {% if is_hint %}
+                    Created {% duration_between obj.created_datetime now %} ago
+                    {% else %}
+                    Received {% duration_between obj.received_datetime now %} ago
+                    {% endif %}
+                    {% endif %}
+                </a>
+            </th>
+            <th>
+                {% if obj.team %}
+                <a href="/team/{{ obj.team.team_name|urlencode:"" }}">
+                    {{ obj.team }}
+                </a>
+                {% endif %}
+            </th>
+            {% if is_hint %}
+            <th>
+                <a href="/solutions/{{ obj.puzzle.solution_slug }}">
+                    {{ obj.puzzle }} Solution
+                </a>
+            </th>
+            {% else %}
+            <td>
+                <a href="/admin/puzzles/{{ name }}/?from_address__exact={{ obj.from_address }}">
+                    {{ obj.from_address }}
+                </a>
+            </td>
+            {% endif %}
+            <th>
+                {% if is_hint %}
+                <a href="/admin/puzzles/answersubmission/?team__id__exact={{ obj.team_id }}&puzzle__id__exact={{ obj.puzzle_id }}">
+                    (guesses)
+                </a>
+                {% endif %}
+            </th>
+        </tr>
+        {% if not obj.claimed_datetime %}
+        <tr>
+            <td>
+                {% if is_hint %}
+                {% if obj.thread_last_claimer %}
+                (reply to <strong>{{ obj.thread_last_claimer }}</strong>)
+                {% endif %}
+                {% endif %}
+            </td>
+            <td>
+                {% if obj.team_id is not None %}
+                <a href="/admin/puzzles/{{ name }}/?team__id__exact={{ obj.team_id }}">
+                    (all from same team)
+                </a>
+                {% endif %}
+            </td>
+            <td>
+                {% if is_hint %}
+                <a href="/admin/puzzles/{{ name }}/?puzzle__id__exact={{ obj.puzzle_id }}">
+                    (all from same puzzle)
+                </a>
+                {% endif %}
+            </td>
+            <td>
+                {% if is_hint %}
+                <a href="/admin/puzzles/{{ name }}/?team__id__exact={{ obj.team_id }}&puzzle__id__exact={{ obj.puzzle_id }}">
+                    (both)
+                </a>
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            {% if is_hint %}
+            <td colspan="4"><pre class="submitted-text">{{ obj.text_content }}</pre></td>
+            {% else %}
+            <td colspan="4"><pre class="submitted-text">{{ obj.subject }}</pre></td>
+            {% endif %}
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </table>
+    <table class="request-table">
+        <tr>
+            <th colspan="3">
+                <hr>
+                <h4>{{ name | capfirst }} stats since hunt start</h4>
+            </th>
+        </tr>
+        <tr>
+            <td colspan="2">
+                {{ name | capfirst }}s answered
+            </td>
+            <td>
+                <strong>{{ num_answered }}</strong>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                Average {{ name }} response time
+            </td>
+            <td>
+                <strong>{% format_duration avg_time %}</strong>
+            </td>
+        </tr>
+        {% if not is_hint %}
+        <tr>
+            <td colspan="2">
+                Queued emails
+            </td>
+            <td>
+                <strong>{{ unsent_email_stats.count }}</strong>{% if unsent_email_stats.count %} from {{ unsent_email_stats.min_scheduled_time }} to {{ unsent_email_stats.max_scheduled_time }}{% endif %}
+            </td>
+        </tr>
+        {% endif %}
+        <tr>
+            <th colspan="3">
+                <hr>
+                <h4>Most responses</h4>
+            </th>
+        </tr>
+        {% for entry in most_answers %}
+        <tr>
+            <td colspan="2">
+                {{ entry.claimer | default:"unknown" }}
+            </td>
+            <td>
+                <a href="/admin/puzzles/{{ name }}/?claimer={{ entry.claimer }}">
+                    {{ entry.count }}
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+        {% if is_hint %}
+        <tr>
+            <th colspan="3">
+                <hr>
+                <h4>Requested by most teams</h4>
+            </th>
+        </tr>
+        {% for entry in popular %}
+        <tr>
+            <td>
+                <a href="/puzzles/{{ entry.puzzle.slug }}">
+                    {{ entry.puzzle.name }}
+                </a>
+            </td>
+            <td>
+                {{ entry.puzzle.metas.all|join:", " }}
+            </td>
+            <td>
+                <a href="/admin/puzzles/{{ name }}/?puzzle__id__exact={{ entry.puzzle.id }}">
+                    {{ entry.count }}
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+    </table>
+</main>
+
+{% endblock %}

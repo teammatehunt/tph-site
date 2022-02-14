@@ -1,0 +1,11 @@
+stages:
+  - build-cache
+
+include: /deploy/common.gitlab-ci.yml
+
+build-cache:
+  stage: build-cache
+  extends: .docker-buildx
+  needs: []
+  variables:
+    BUILDX_CACHE: 1

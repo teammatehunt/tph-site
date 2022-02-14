@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load puzzle_tags %}
+
+{% block page-title %}
+<title>Errata</title>
+{% endblock %}
+
+{% block content %}
+
+<h1>Errata</h1>
+
+<main>
+    <p>This lists all errata currently issued for the hunt. From here, we can
+    send notification emails to all teams that have unlocked the errataed puzzle.</p>
+    <table class="errata-table">
+        {% for erratum in errata %}
+        <tr>
+            <td>
+                On <strong>{{ erratum.creation_time }}</strong>, for <strong>{{ erratum.puzzle.name }}</strong>:
+                <br />
+                {{ erratum.text }}
+            </td>
+            <td>
+                <a href="{% url 'errata-email' erratum.id %}">
+                    Send email to affected teams
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</main>
+
+{% endblock %}
