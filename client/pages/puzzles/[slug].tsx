@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React from 'react';
 
 import Custom404 from 'pages/404';
 import Puzzle, { getPuzzleProps } from 'components/puzzle';
@@ -25,6 +25,8 @@ const PlaceholderPuzzle = ({ puzzleData }) => {
 };
 
 export default PlaceholderPuzzle;
+
+// This handles redirects internally
 export const getServerSideProps = async (context) => {
   const { res, params } = context;
   const { slug } = params || {};

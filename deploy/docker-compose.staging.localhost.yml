@@ -1,17 +1,33 @@
 # This docker compose override file is used to build and start a staging environment locally
-version: '3.7'
+version: "3.7"
 
 services:
+  db:
+    volumes:
+      - pgdata:/var/lib/postgresql/data
   tph:
-    build: .
+    build:
+      context: .
+      args:
+        ENABLE_HUNT_SITE: 1
     environment:
       - SERVER_ENVIRONMENT=staging
-      - SERVER_HOSTNAME=localhost
+      - UVICORN_NUM_PROCS=1
+      - CELERY_NUM_PROCS=1
+      - HUNT_HOST=localhost:8081
+      - CADDY_HUNT_HOST=localhost:8081
+      - REGISTRATION_HOST=localhost:8083
+      - CADDY_REGISTRATION_HOST=localhost:8083
+    networks:
+      default:
+        aliases:
+          - django
     ports:
-      - '127.0.0.1:8080:80'
-      - '127.0.0.1:8081:443'
+      - "127.0.0.1:8080-8083:8080-8083"
+      - "127.0.0.1:8081-8083:8081-8083/udp"
     volumes:
       - srv:/srv
 
 volumes:
+  pgdata:
   srv:

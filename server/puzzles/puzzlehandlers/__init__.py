@@ -1,9 +1,10 @@
-import json
 from functools import wraps
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
 from ratelimit.decorators import ratelimit
 from ratelimit.utils import get_usage_count
+
+from spoilr.utils import json
 
 
 def simple_ratelimit(handler, rate):
@@ -44,13 +45,13 @@ def puzzle_key(group, request):
     # counter per puzzle.
     if request.context.team is None:
         # Treat IP-address as name
-        team_name = request.META["REMOTE_ADDR"]
+        name = request.META["REMOTE_ADDR"]
     else:
         # Use the username, not the teamname, just to avoid potential
         # Unicode nonsense.
-        team_name = request.context.team.user.username
+        name = request.context.team.username
     puzzle_name = request.context.puzzle.name
-    return f"{team_name}-{puzzle_name}"
+    return f"{name}-{puzzle_name}"
 
 
 class RateLimitException(Exception):

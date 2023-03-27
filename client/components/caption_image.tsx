@@ -8,7 +8,15 @@ interface Props {
 /** Generic component for an image with a caption. */
 const CaptionImage: FunctionComponent<
   Props & React.ImgHTMLAttributes<HTMLImageElement>
-> = ({ caption, src, clickForFullSize = false, alt, children, ...props }) => {
+> = ({
+  caption,
+  id,
+  src,
+  clickForFullSize = false,
+  alt,
+  children,
+  ...props
+}) => {
   const Wrapper = clickForFullSize ? 'a' : 'div';
 
   const fullCaption = Array.isArray(caption) ? caption.join(' ') : caption;
@@ -16,26 +24,33 @@ const CaptionImage: FunctionComponent<
 
   return (
     <>
-      <Wrapper className="center" href={clickForFullSize ? src : undefined}>
+      <Wrapper
+        className="text-center"
+        href={clickForFullSize ? src : undefined}
+        target={clickForFullSize ? '_blank' : ''}
+        rel={clickForFullSize ? 'noopener noreferrer' : ''}
+        role="figure"
+        aria-labelledby={`caption-${id}`}
+      >
         {children ?? (
           <img
             src={src}
-            className="centerimg"
+            className="block mx-auto"
             alt={alt ?? fullCaption ?? ''}
             {...props}
           />
         )}
       </Wrapper>
       {caption && (
-        <p className="center caption" aria-hidden>
-          <i>
+        <p className="text-center caption" id={`caption-${id}`}>
+          <strong>
             {captionArray.map((line, i) => (
               <Fragment key={line}>
                 {line}
                 {i < caption.length - 1 && <br />}
               </Fragment>
             ))}
-          </i>
+          </strong>
         </p>
       )}
       <style jsx>{`
@@ -65,7 +80,7 @@ export const CaptionImages: FunctionComponent<CaptionImagesProps> = ({
   ...props
 }) => (
   <CaptionImage caption={caption} {...props}>
-    <div className="flex-center-vert">
+    <div className="flex items-center justify-center">
       {srcs.map((imageSrc, i) => (
         <img
           src={imageSrc}

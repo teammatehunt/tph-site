@@ -1,0 +1,9 @@
+version: '3.7'
+
+services:
+  tph:
+    build:
+      args:
+        ENABLE_REGISTRATION_SITE: 1
+    environment:
+      - ENABLE_REGISTRATION_SITE=1

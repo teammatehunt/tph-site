@@ -1,0 +1,32 @@
+default_stages:
+  - commit
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.2.0
+    hooks:
+      - id: no-commit-to-branch
+        name: ensure non-protected branch
+        args: [--branch, staging, --branch, main]
+        fail_fast: true
+        stages: [commit, merge-commit, push]
+      - id: check-added-large-files
+        args: ['--maxkb=100000'] # Github limit
+      - id: check-merge-conflict
+  - repo: https://github.com/psf/black
+    rev: 22.3.0
+    hooks:
+      - id: black
+        exclude: ^.*\b(migrations)\b.*$
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v2.6.2
+    hooks:
+      - id: prettier
+        types_or: ["tsx", "markdown"]
+  - repo: local
+    hooks:
+      - id: optipng
+        name: optipng
+        language: system
+        # run optipng stripping metadata and de-interlacing
+        entry:  optipng -strip all -i0 -o3 
+        types: ["png"]

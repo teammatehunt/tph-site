@@ -1,5 +1,5 @@
 import React from 'react';
-import Link from 'next/link';
+import Link from 'components/link';
 
 import Section from 'components/section';
 import Title from 'components/title';

@@ -1,0 +1,7 @@
+{% if update.puzzle %}
+<p>An erratum was issued for the puzzle <strong>{{ update.puzzle.name }}</strong>.</p>
+
+<p><strong>Erratum:</strong> {{ update.body|linebreaksbr }}</p>
+{% else %}
+<p>{{ update.body|linebreaksbr }}</p>
+{% endif %}

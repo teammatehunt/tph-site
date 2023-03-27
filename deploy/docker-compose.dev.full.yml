@@ -1,0 +1,7 @@
+version: '3.7'
+
+services:
+  tph:
+    build:
+      args:
+        FULL_PYTHON: 1

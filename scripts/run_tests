@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -e
+REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
+cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
+
+# Usage: ./scripts/run_tests
+
+docker-compose exec -T -w /app/server tph ./manage.py test

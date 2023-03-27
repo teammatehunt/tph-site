@@ -1,0 +1,9 @@
+- model: spoilr_core.huntsetting
+  pk: 2
+  fields:
+    name: spoilr.hunt.end_time
+    text_value: null
+    boolean_value: null
+    date_value: 2023-01-16 17:00:00+00:00
+    create_time: 2022-10-29 19:43:27.287327+00:00
+    update_time: 2022-10-29 19:43:27.287334+00:00

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -e
+REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
+cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
+
+args=()
+if [ "$1" = "--reg" ]; then
+  args+=("-f" "deploy/docker-compose.registration.yml")
+  shift
+fi
+
+if [ "$1" = "--posthunt" ]; then
+  args+=("-f" "deploy/docker-compose.registration.yml" "-f" "deploy/docker-compose.posthunt.yml")
+  shift
+fi
+
+if [[ -f .env ]] ; then
+  args+=("-f" "deploy/docker-compose.env.yml")
+fi
+
+docker-compose() {
+  DOCKER_BUILDKIT=1 command docker-compose -f docker-compose.yml -f deploy/docker-compose.staging.localhost.yml "${args[@]}" "$@"
+}
+
+docker-compose build
+mkdir -p client/node_modules
+docker-compose up -d
+docker-compose exec -T tph /app/server/manage.py migrate --no-input
+# docker-compose exec -T tph /app/server/manage.py loaddata /app/server/fixtures/puzzles.yaml
+# docker-compose exec -T tph /app/server/manage.py loaddata /app/server/fixtures/story.yaml
+# docker-compose exec tph /app/server/manage.py ensure_user_created admin --password admin --admin
+# TODO: handle creating a superuser
+docker-compose exec -T tph /app/server/manage.py check

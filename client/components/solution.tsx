@@ -1,58 +1,91 @@
 import React, { FunctionComponent, ReactFragment, useContext } from 'react';
 import Head from 'next/head';
+import Link from 'components/link';
 import cx from 'classnames';
 
+import { PuzzleDataProps, RoundHeader } from 'components/puzzle';
 import PuzzleTitle from 'components/puzzle_title';
 import InfoIcon from 'components/info_icon';
-import LinkIfStatic from 'components/link';
 import Section from 'components/section';
 
-interface PuzzleData {
-  title: string;
-  slug: string;
+interface Props extends PuzzleDataProps {
+  titleHtml?: React.ReactFragment;
   answer: string;
   maxWidth?: boolean;
+  maxWidthPx?: number;
   authors?: ReactFragment;
-  url?: string;
-  round?: string;
+  additionalCreds?: ReactFragment;
+  answerClasses?: string;
   smallTitle?: boolean;
+  dark?: boolean;
 }
 
 /**
  * Wrapper component for all solutions, providing some common formatting.
  */
-const Solution: FunctionComponent<PuzzleData> = ({
-  title,
-  slug,
+const Solution: FunctionComponent<Props> = ({
+  puzzleData,
   answer,
   authors,
-  round,
+  additionalCreds,
   maxWidth = true,
-  url = undefined,
+  maxWidthPx = 900,
+  titleHtml,
+  answerClasses = '',
   smallTitle = false,
+  dark = false,
   children,
 }) => {
+  const AnswerWrapper = answer.includes('\n') ? 'pre' : 'span';
+  const roundSlug = puzzleData.round?.slug ?? '';
+  const darkMode = dark;
+
   return (
     <>
       <Head>
         <meta name="robots" content="noindex" />
-        <title>{title} - Solution</title>
+        <title>{puzzleData.name} - Solution</title>
       </Head>
 
-      <div className="title flex-center-vert">
-        <PuzzleTitle title={title} small={smallTitle} />
+      {puzzleData.round?.header && <RoundHeader round={puzzleData.round} />}
+      <div className="title flex items-center justify-center">
+        {titleHtml || (
+          <PuzzleTitle title={puzzleData.name} small={smallTitle} />
+        )}
       </div>
-      <Section className={cx({ maxWidth })}>
-        <div className="center">
-          {authors && <h3>{authors}</h3>}
-          <h3>
-            Answer: <span className="spoiler monospace">{answer}</span>
-          </h3>
-          <div className="link">
-            <LinkIfStatic href={`/stats/${slug}`}>View Stats</LinkIfStatic>
-            <LinkIfStatic href={url || `/puzzles/${slug}`}>
-              Back to Puzzle
-            </LinkIfStatic>
+      <Section
+        darkMode={darkMode}
+        className={cx('solution', {
+          maxWidth,
+          'bg-white after:bg-white after:drop-shadow-md rounded-md': !darkMode,
+        })}
+      >
+        <div className="text-center">
+          {authors && <h3>by {authors}</h3>}
+          {additionalCreds && <h3>{additionalCreds}</h3>}
+          {answer && (
+            <h3>
+              Answer:{' '}
+              <div>
+                <AnswerWrapper
+                  className={cx('spoiler font-mono', answerClasses)}
+                >
+                  {answer}
+                </AnswerWrapper>
+              </div>
+            </h3>
+          )}
+          <div className="link space-x-2">
+            {answer && (
+              <Link href={`/stats/${puzzleData.slug}`} passHref>
+                <a>View Stats</a>
+              </Link>
+            )}
+            {puzzleData.url && (
+              <Link href={puzzleData.url} passHref>
+                <a>Back to Puzzle</a>
+              </Link>
+            )}
           </div>
         </div>
 
@@ -60,8 +93,19 @@ const Solution: FunctionComponent<PuzzleData> = ({
       </Section>
 
       <style jsx>{`
+        :global(.solution) {
+          position: relative;
+          z-index: 1;
+        }
+
+        :global(#__next) {
+          background-image: ${puzzleData.round?.background
+            ? `url(${puzzleData.round.background}) !important`
+            : 'inherit'};
+        }
+
         :global(section.maxWidth) {
-          max-width: 900px;
+          max-width: ${maxWidthPx}px;
         }
 
         .title {
@@ -70,7 +114,7 @@ const Solution: FunctionComponent<PuzzleData> = ({
 
         .link {
           display: flex;
-          flex-direction: column;
+          justify-content: center;
           margin: 20px 0 40px;
         }
       `}</style>
@@ -80,20 +124,18 @@ const Solution: FunctionComponent<PuzzleData> = ({
 
 /** Common styling for an intermediate clue phrase */
 export const Clue: FunctionComponent<{}> = ({ children }) => (
-  <span className="monospace">{children}</span>
+  <span className="font-mono">{children}</span>
 );
 
 /** Common styling for the answer, in monospace. */
-export const Answerize: FunctionComponent<{}> = ({ children }) => (
-  <strong className="monospace">
-    {children}
-
-    <style jsx>{`
-      .monospace {
-        font-size: 16px;
-      }
-    `}</style>
-  </strong>
-);
+export const Answerize: FunctionComponent<{ children: string }> = ({
+  children,
+}) =>
+  children.indexOf('\n') > -1 ? (
+    // If there is a newline, render as a <pre> block.
+    <pre className="answer max-w-fit mx-auto font-mono">{children}</pre>
+  ) : (
+    <strong className="answer font-mono">{children}</strong>
+  );
 
 export default Solution;

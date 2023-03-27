@@ -1,4 +1,3 @@
-from collections import namedtuple
 import contextlib
 import datetime
 import email
@@ -10,10 +9,12 @@ import math
 import smtplib
 import time
 import traceback
+from collections import namedtuple
 
 from django.conf import settings
 from django.db import transaction
-from django.template import Context as TemplateContext, Template
+from django.template import Context as TemplateContext
+from django.template import Template
 
 if settings.IS_PYODIDE:
     get_task_logger = logging.getLogger
@@ -21,16 +22,19 @@ else:
     from celery.utils.log import get_task_logger
     import imapclient
 
-from puzzles.models import BadEmailAddress, EmailTemplate, Email, Hint, Team, TeamMember
-from puzzles.celery import celery_app
-from puzzles.utils import redis_lock
+from spoilr.core.models import User, UserTeamRole
+from spoilr.email.models import BadEmailAddress, Email, EmailTemplate
+from spoilr.hints.models import Hint
+from spoilr.registration.models import TeamRegistrationInfo
 
+from puzzles.celery import celery_app
+from puzzles.models import Team
+from puzzles.utils import redis_lock
 
 task_logger = get_task_logger(__name__)  # for Celery tasks
 django_logger = logging.getLogger("django")  # for single process tasks
 
 
-EMAIL_HOST_USER = f"{settings.EMAIL_USER_LOCALNAME}@{settings.EMAIL_USER_DOMAIN}"
 # port 465 starts in SSL mode, port 587 needs to upgrade the connection
 SMTP = smtplib.SMTP if settings.EMAIL_PORT == 587 else smtplib.SMTP_SSL
 
@@ -156,6 +160,10 @@ class ImapClient:
         email_message = email.message_from_bytes(
             raw_content, policy=email.policy.default
         )
+        if Email.check_is_from_admin(email_message):
+            # Skip admin error reports
+            return
+
         message_id = Email.parseaddr(email_message.get("Message-ID"))
         selectors = {
             "uidvalidity": self.uidvalidity,
@@ -211,7 +219,7 @@ class ImapClient:
             )
             try:
                 ancestor_hint = root_email and root_email.hint
-            except Hint.DoesNotExist:
+            except Email.hint.RelatedObjectDoesNotExist:
                 ancestor_hint = None
 
         # check if this email part of a bounce / unsubscribe / resubscribe action
@@ -255,9 +263,11 @@ class ImapClient:
         fields["created_via_webapp"] = False
         from_address = Email.parseaddr(email_message.get("From"))
         if from_address and not is_from_us:
-            teammember = TeamMember.objects.filter(email=from_address).first()
-            if teammember is not None:
-                fields["team_id"] = teammember.team_id
+            registration = TeamRegistrationInfo.objects.filter(
+                contact_email=from_address
+            ).first()
+            if registration and registration.team_id:
+                fields["team_id"] = registration.team_id
 
         cm = (
             transaction.atomic()
@@ -330,8 +340,8 @@ class ImapClient:
             modseq = last_email.modseq
         with cls(
             host=settings.EMAIL_HOST,
-            account=EMAIL_HOST_USER,
-            password=settings.EMAIL_PASSWORD,
+            account=settings.EMAIL_HOST_USER,
+            password=settings.EMAIL_HOST_PASSWORD,
             timestamp=timestamp,
             uidvalidity=uidvalidity,
             modseq=modseq,
@@ -362,6 +372,9 @@ def task_send_email(
     ):
         assert settings.EMAIL_PORT in (465, 587)
         email_obj = Email.objects.get(pk=pk)
+        if email_obj.status == Email.CANCELLED:
+            return
+
         assert email_obj.status == Email.SENDING
         if message_id is not None:
             assert message_id == email_obj.message_id
@@ -430,7 +443,9 @@ def task_send_email(
                 if connection is not active_connection:
                     if settings.EMAIL_PORT == 587:
                         connection.starttls()
-                    connection.login(EMAIL_HOST_USER, settings.EMAIL_PASSWORD)
+                    connection.login(
+                        settings.EMAIL_HOST_USER, settings.EMAIL_HOST_PASSWORD
+                    )
                 connection.sendmail(
                     sendfrom_address,
                     recipients,
@@ -441,6 +456,7 @@ def task_send_email(
             task_logger.info(f"Would have sent email:\n{email_obj.raw_content}\n")
 
 
+# This is not hooked up to anything
 @celery_app.task
 def task_resend_emails(
     *,
@@ -469,7 +485,7 @@ def task_resend_emails(
         with SMTP(settings.EMAIL_HOST, settings.EMAIL_PORT) as connection:
             if settings.EMAIL_PORT == 587:
                 connection.starttls()
-            connection.login(EMAIL_HOST_USER, settings.EMAIL_PASSWORD)
+            connection.login(settings.EMAIL_HOST_USER, settings.EMAIL_HOST_PASSWORD)
             for pk in pks:
                 try:
                     task_send_email(
@@ -487,46 +503,12 @@ Batch = namedtuple("Batch", ("user", "team", "address_index", "addresses"))
 def _get_email_template_batches(template_obj):
     batches = []
 
-    if template_obj.recipients in (
-        EmailTemplate.RECIPIENT_BATCH_USERS,
-        EmailTemplate.RECIPIENT_USERS,
-    ):
-        users = (
-            TeamMember.objects.filter(
-                pk__gt=template_obj.last_user_pk,
-                team__pk__gt=template_obj.last_team_pk,
-            )
-            .exclude(
-                email__exact="",
-            )
-            .order_by("pk")
-        )
-        batch_size = (
-            template_obj.batch_size
-            if template_obj.recipients == EmailTemplate.RECIPIENT_BATCH_USERS
-            else 1
-        )
-        for batch_iter in itertools.zip_longest(*(iter(users),) * batch_size):
-            batch = list(filter(None, batch_iter))
-            batches.append(
-                Batch(
-                    user=max(batch, key=lambda user: user.pk),
-                    team=None,
-                    address_index=None,
-                    addresses=[user.email for user in batch],
-                )
-            )
-
-    elif template_obj.recipients == EmailTemplate.RECIPIENT_TEAMS:
-        teams = (
-            Team.objects.filter(
-                pk__gt=template_obj.last_team_pk,
-            )
-            .prefetch_related("teammember_set")
-            .order_by("pk")
-        )
+    if template_obj.recipients == EmailTemplate.RECIPIENT_TEAMS:
+        teams = Team.objects.filter(
+            pk__gt=template_obj.last_team_pk,
+        ).order_by("pk")
         for team in teams:
-            addresses = team.get_emails()
+            addresses = team.all_emails
             if addresses:
                 batches.append(
                     Batch(
@@ -588,7 +570,7 @@ def task_send_email_template(
         with SMTP(settings.EMAIL_HOST, settings.EMAIL_PORT) as connection:
             if settings.EMAIL_PORT == 587:
                 connection.starttls()
-            connection.login(EMAIL_HOST_USER, settings.EMAIL_PASSWORD)
+            connection.login(settings.EMAIL_HOST_USER, settings.EMAIL_HOST_PASSWORD)
 
             if template_obj.status == EmailTemplate.SCHEDULED:
                 template_obj.status = EmailTemplate.SENDING
@@ -622,7 +604,13 @@ def task_send_email_template(
                         )
                     )
                     if email_obj.all_recipients:
-                        email_obj.save(active_connection=connection)
+                        email_obj.save()
+                        transaction.on_commit(
+                            lambda: task_send_email(
+                                email_obj.pk,
+                                active_connection=connection,
+                            )
+                        )
         template_obj.status = EmailTemplate.SENT
         template_obj.save(update_fields=("status",))
 
@@ -661,16 +649,10 @@ def email_obj_for_batch(email_template, batch, message_id=None):
     email_message.add_alternative(html_content, subtype="html")
 
     kwargs = {}
-    if email_template.recipients in (
-        EmailTemplate.RECIPIENT_USERS,
-        EmailTemplate.RECIPIENT_TEAMS,
-    ):
+    if email_template.recipients in (EmailTemplate.RECIPIENT_TEAMS,):
         email_message["To"] = batch.addresses
     else:
-        assert email_template.recipients in (
-            EmailTemplate.RECIPIENT_BATCH_USERS,
-            EmailTemplate.RECIPIENT_BATCH_ADDRESSES,
-        )
+        assert email_template.recipients in (EmailTemplate.RECIPIENT_BATCH_ADDRESSES,)
         kwargs["bcc_addresses"] = batch.addresses
 
     email_obj = Email.FromEmailMessage(

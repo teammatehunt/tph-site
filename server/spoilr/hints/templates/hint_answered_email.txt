@@ -1,0 +1,9 @@
+{% autoescape off %}
+Your hint question for the puzzle {{ hint_response.puzzle.name }} has been answered ({{ hint_response.puzzle_hint_url }}).
+
+{% if hint_request %}Question:
+{{ hint_request.text_content }}
+{% endif %}
+Response:
+{{ hint_response.text_content }}
+{% endautoescape %}

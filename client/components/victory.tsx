@@ -9,11 +9,9 @@ import React, {
 } from 'react';
 import Head from 'next/head';
 
-import HuntInfoContext, { Story } from 'components/context';
+import HuntInfoContext from 'components/context';
 import Confetti from 'components/confetti';
 import Section from 'components/section';
-import { notifsKey, addSeenNotifs } from 'components/story_notifications';
-import { useLocalStorage } from 'utils/storage';
 
 interface Props {
   teamInfo?: {
@@ -24,17 +22,7 @@ interface Props {
 }
 
 const Victory: FunctionComponent<Props> = () => {
-  const { huntInfo, userInfo } = useContext(HuntInfoContext);
-  // If they're looking at victory page, no more story notifications needed.
-  // Only advance this for logged in users - after hunt close, logged out
-  // users can be further ahead than new teams, which can cause problems.
-  if (huntInfo?.storyUnlocks && !!userInfo?.teamInfo) {
-    if (typeof window !== 'undefined') {
-      const typedDefault: string[] = [];
-      const notifs = useLocalStorage<string[]>(notifsKey, typedDefault);
-      addSeenNotifs(notifs, huntInfo.storyUnlocks);
-    }
-  }
+  const { userInfo } = useContext(HuntInfoContext);
   const teamInfo = userInfo?.teamInfo;
 
   const w = 950;
@@ -67,10 +55,10 @@ const Victory: FunctionComponent<Props> = () => {
         <div className="container" ref={ref}>
           <img className="finale" src={undefined /* FIXME */} />
         </div>
-        <p>You’ve completed the FIXME Hunt!</p>
+        <p>You’ve completed Matt and Emma's FIXME!</p>
         <p>
-          Thank you, <b>{teamInfo?.name ?? ''}</b>, for spoiler free
-          answer-phrase.
+          Thank you, <b>{teamInfo?.name ?? ''}</b>, for bringing Matt and Emma
+          home.
         </p>
         <p>
           Before you go, we would love to{' '}

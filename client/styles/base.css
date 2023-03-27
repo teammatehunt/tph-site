@@ -1,0 +1,357 @@
+/* These styles are shared with the main and registration site. */
+
+:root {
+  --max-scroll-bar-width: 20px;
+}
+
+h1 {
+  font-size: min(100px, 8vh) !important;
+  font-weight: 500 !important;
+  line-height: min(100px, 8vh);
+  color: var(--text);
+  text-shadow: 4px 4px 0px rgba(0, 6, 138, 0.25);
+  margin-bottom: 0.01em;
+  word-wrap: break-word;
+}
+
+h1.font-title {
+  word-wrap: normal;
+}
+
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--text);
+}
+
+body {
+  /* background image in layout.tsx, not sure if we can load assets in .css files */
+  background-color: var(--background);
+  background-attachment: fixed, fixed;
+  margin: 0;
+
+  font-size: 1rem;
+  font-variant-numeric: lining-nums;
+  color: var(--text);
+}
+
+html {
+  box-sizing: border-box;
+}
+*,
+*:before,
+*:after {
+  box-sizing: inherit;
+}
+
+h2 {
+  font-size: 40px !important;
+}
+
+h3 {
+  font-size: 24px !important;
+  margin: 20px 0;
+}
+
+h4 {
+  font-size: 20px !important;
+}
+
+h5 {
+  font-size: 16px !important;
+}
+
+h6 {
+  font-size: 14px !important;
+}
+
+.abs-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.abs-center-x {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.formerror {
+  color: var(--error);
+  font-size: 14px;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.link {
+  color: var(--link) !important;
+}
+
+.primary {
+  color: var(--primary) !important;
+}
+
+.error {
+  color: var(--error) !important;
+}
+
+.white {
+  color: var(--white) !important;
+}
+
+.black {
+  color: var(--black) !important;
+}
+
+input, textarea {
+  background: transparent;
+  border: 1px solid var(--text);
+  color: var(--text);
+}
+
+button,
+input[type='submit'] {
+  background: var(--primary);
+  color: var(--on-primary);
+  cursor: pointer;
+}
+
+button.border,
+input[type='submit'].border {
+  border: 1px solid var(--border);
+}
+
+button:hover,
+input[type='submit']:hover {
+  filter: brightness(1.2);
+}
+
+
+button:disabled,
+input[type='submit']:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+a {
+  color: var(--link) !important;
+  cursor: pointer;
+  text-underline-offset: 4px;
+}
+
+/* Always underline and show pointer even if no href set. */
+a:not(.no-underline) {
+  text-decoration: underline !important;
+}
+
+.bg-red {
+  background: #c33;
+}
+
+.bg-pink {
+  background: lightpink;
+}
+
+.bg-green {
+  background: #3c3;
+}
+
+.bg-darkgreen {
+  background: #003d07;
+}
+
+.bg-black {
+  background: #000;
+}
+
+.bg-darkblue {
+  background: #0b264a;
+}
+
+.bg-lightblue {
+  background: lightblue;
+}
+
+.bg-yellow {
+  background: #ffd59b;
+}
+
+.bg-darkyellow {
+  background: #f3d573;
+}
+
+.bg-orange {
+  background: orange;
+}
+
+.bg-pink {
+  background: lightpink;
+}
+
+.bg-grey {
+  background: darkgrey;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.col-50 {
+  flex: 50%;
+}
+
+.truncate {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fill the width of the screen minus a bit for the scrollbar */
+.w-fill-screen {
+  width: calc(100vw - var(--max-scroll-bar-width));
+  margin-left: calc(50% - (50vw - var(--max-scroll-bar-width) / 2));
+}
+
+table {
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+table:not(.text-center) th:not(.text-center):not(.text-right) {
+  text-align: left;
+}
+
+table.center td {
+  text-align: center;
+}
+
+table.bordered th,
+table.bordered td {
+  border: 1px solid var(--black);
+  padding: 8px 20px;
+}
+
+@media (max-width: 550px) {
+  .collapse {
+    flex: 100%;
+  }
+}
+
+.copy-only, .copy-html-only {
+  display: none;
+}
+
+.spoiler {
+  background: var(--black);
+  border-radius: 4px;
+  padding: 0 4px;
+  transition: all 300ms ease-in-out;
+}
+
+.spoiler:not(:hover) {
+  color: var(--black) !important;  /* important to override visited links */
+}
+
+.spoiler:hover,
+.spoiler:focus {
+  background: rgba(0, 0, 0, 0);
+}
+
+.secondary {
+  color: var(--secondary);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.bg-navbar {
+  background-color: var(--navbar);
+}
+
+.chat-bubble {
+  background: var(--chat-ai);
+  color: var(--text);
+  padding: 0.375rem;
+  border-radius: 0.5rem;
+  max-width: fit-content;
+}
+
+.chat-bubble.error {
+  color: var(--error) !important;
+}
+
+/* FIXME: Remove if using an actual smallcaps font */
+.font-smallcaps {
+  text-transform: uppercase;
+}
+
+/* Fix wrapping issues on smaller devices */
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.prefer-2-col {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+div [data-a11y-footnotes-ref] {
+  text-decoration: inherit !important;
+}
+
+div [data-a11y-footnotes-ref]::after {
+  color: var(--link);
+}
+
+div [data-a11y-footnotes-list-item]:target {
+  background-color: inherit;
+}
+
+body .darkmode {
+  color: var(--white);
+}
+
+.darkmode input {
+  border-color: white;
+}
+
+.darkmode select {
+  background: var(--background);
+}
+
+@media print {
+  body .darkmode {
+    color: black;
+  }
+
+  .text-white {
+    color: black !important;
+  }
+
+  .darkmode .dark\:invert {
+    /* Undo dark mode inverts in Tailwind's styling when printing */
+    --tw-invert: none !important;
+  }
+
+  .break-after {
+    page-break-after: always;
+  }
+}

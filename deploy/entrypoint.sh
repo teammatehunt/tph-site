@@ -4,6 +4,10 @@
 mkdir -p /srv/logs
 mkdir -p /srv/data
 mkdir -p /srv/media
+mkdir -p /srv/uploads
 mkdir -p /srv/config/pgbouncer
 
-supervisord --nodaemon --configuration /etc/supervisord.conf
+# exec into supervisord, replacing this process and passing all signals
+if [ -z "$DONT_RUN_SERVER" ]; then
+  exec supervisord --nodaemon --configuration /etc/supervisord.conf
+fi

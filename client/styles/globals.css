@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import './base.css';
+@import './theme.css';
+
+@layer base {
+  h1 {
+    font-family: theme('fontFamily.title');
+  }
+
+  body {
+    font-family: theme('fontFamily.serif');
+  }
+
+  /* Revert some Tailwind overrides, like removing list styling */
+  ol, ul {
+    list-style: revert;
+    padding-left: revert;
+  }
+  p {
+    margin-block: 1rem;
+  }
+  /* Styles for not double-counting spacing. TODO: consider removing if autopostprod stops using <br/> */
+  br + p {
+    margin-top: 0;
+  }
+  p + br {
+    display: none;
+  }
+}

@@ -1,0 +1,22 @@
+name: deploy-branch
+
+on:
+  workflow_dispatch:
+
+concurrency: deploy-branch-frontend-${{ github.ref }}
+
+jobs:
+  deploy-branch:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      TEST_BRANCH_FRONTEND: 1
+      DEPLOY_USER: branch
+      DEPLOY_HOST: branch.teammatehunt.com
+      DEPLOY_DIR: branch/
+      DEPLOY_TYPE: branch
+      SERVER_ENVIRONMENT: test_branch
+      HUNT_HOST: .branch.teammatehunt.com
+      REGISTRATION_HOST: .branch.teammatehunt.com:8072
+      EXTRA_ENV: |-
+        GOOGLE_ANALYTICS_ID=FIXME
+    secrets: inherit

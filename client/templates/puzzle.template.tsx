@@ -1,20 +1,24 @@
 import React, { FC, useRef } from 'react';
 
-import CopyToClipboard from 'components/copy';
-import Puzzle, { PuzzleData, getPuzzleProps } from 'components/puzzle';
+import { Monospace } from 'components/copy';
+import FlavorText from 'components/flavor_text';
+import Puzzle, {
+  PuzzleData,
+  PuzzleDataProps,
+  getPuzzleProps,
+} from 'components/puzzle';
+import SheetableImage from 'components/sheetable_image';
+import Table from 'components/table';
+
+/*[[INSERT IMPORTS]]*/
 
 const SLUG = '[[INSERT SLUG]]';
 
-const PuzzlePage: FC<{ puzzleData: PuzzleData }> = ({ puzzleData }) => {
+const PuzzlePage: FC<PuzzleDataProps> = ({ puzzleData }) => {
   const ref = useRef<HTMLDivElement>(null);
   return (
-    <Puzzle puzzleData={puzzleData}>
-      <div ref={ref}>[[INSERT PUZZLE CONTENT]]</div>
-
-      {/* TODO: By default this adds a copy-to-clipboard for the entire puzzle
-       * content. You may wish to copy a smaller portion, just pass in "text",
-       * or omit it entirely. */}
-      <CopyToClipboard textRef={ref} />
+    <Puzzle puzzleData={puzzleData} copyData={{ ref }}>
+      <div ref={ref}>[[INSERT CONTENT]]</div>
 
       {/* TODO: uncomment if you wish to include your own styles.
       <style jsx>{`

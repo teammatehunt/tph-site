@@ -11,5 +11,9 @@ assert sys.version_info.major == 3, "Use Python 3"
 class PuzzlesConfig(AppConfig):
     name = "puzzles"
 
+    def ready(self):
+        # Connect the signal handlers registered in signals
+        from . import signals
+
 
 default_app_config = "puzzles.PuzzlesConfig"

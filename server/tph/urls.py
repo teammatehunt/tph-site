@@ -16,12 +16,12 @@ Including another URLconf
 from typing import Callable, List, Mapping, Tuple
 
 from django.conf import settings
-from django.conf.urls import include, url
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path, re_path
-from puzzles.views import auth, puzzles, team, views
+from django.views.generic.base import RedirectView
+from puzzles.views import auth, hunt, interactions, puzzles, story, team, views
 
 # A map from slug to list of endpoint tuples (endpoint url, API handler)
 PUZZLE_SPECIFIC_ENDPOINTS: Mapping[str, List[Tuple[str, Callable]]] = {
@@ -33,104 +33,107 @@ urlpatterns = list(
     filter(
         None,
         [
-            re_path(r"^admin/", admin.site.urls),
+            not settings.IS_PYODIDE and path("", include("django_prometheus.urls")),
             not settings.IS_PYODIDE
             and re_path(r"^impersonate/", include("impersonate.urls")),
             # urls for password reset: request_reset, validate_token, and reset_password
             path("api/", include("pwreset.urls")),
-            re_path(r"^api/teams/", team.teams),
-            re_path(r"^api/team_info/(?P<slug>.+)/edit", team.edit_team),
-            re_path(r"^api/team_info/(?P<slug>.+)?", team.get_team_info),
-            re_path(r"^api/upload_profile_pic/(?P<slug>.+)", team.upload_profile_pic),
-            re_path(r"^api/delete_profile_pic/(?P<slug>.+)", team.delete_profile_pic),
-            re_path(r"^api/unlock_everything", team.unlock_everything),
-            re_path(r"^api/hunt_info", views.get_hunt_info),
-            re_path(r"^api/login", auth.log_in),
-            re_path(r"^api/logout", auth.log_out),
-            re_path(r"^api/register", auth.register),
-            re_path(r"^api/puzzles", puzzles.puzzles),
-            re_path(r"^api/unsubscribe", team.unsubscribe),
-            path("api/solve/<slug:slug>", puzzles.solve),
-            path("api/puzzle/<slug:slug>", puzzles.puzzle_data),
-            path("api/puzzle/<slug:slug>/hint", puzzles.create_hint),
-            path("api/puzzle/<slug:slug>/moreguesses", puzzles.request_more_guesses),
-            path("api/stats/<slug:slug>", views.stats_public),
-            path("api/guess_log", views.public_activity_csv),
-            path("api/server.zip", views.server_zip),
-            path("api/reset_local_database", views.reset_pyodide_db),
-            # example puzzle page with copy-to-clipboard
-            path("clipboard", views.clipboard, name="clipboard"),
-            # special path only for Caddy to check whether the client should be allowed
-            # access to the requested resource based on progression
-            re_path(
-                r"^check/(?P<original_path>.+)",
-                auth.check_access_allowed,
-            ),
-            # Staff endpoints that aren't tied to the default Django admin site.
-            re_path(
-                r"^internal/approve_picture/(?P<user_name>.+)",
-                views.approve_profile_pic,
-                name="approve_picture",
-            ),
-            re_path(r"^internal/?$", views.internal_home, name="internal_home"),
-            # TODO: once the hunt is over, switch to huntinfo/*
-            re_path(r"^internal/bigboard", views.bigboard, name="bigboard"),
-            re_path(r"^internal/finishers", views.finishers, name="finishers"),
-            re_path(r"^internal/hunt_stats", views.hunt_stats, name="hunt-stats"),
-            re_path(r"^internal/all_pictures", views.all_pictures, name="all-pictures"),
-            # END-TODO
-            re_path(r"^internal/hint_csv", puzzles.hint_csv, name="hint_csv"),
-            re_path(r"^internal/hint_list", puzzles.hint_list, name="hint-list"),
-            re_path(
-                r"^internal/unanswered_email_list",
-                puzzles.unanswered_email_list,
-                name="unanswered-email-list",
-            ),
-            re_path(
-                r"^internal/advanceteam/(?P<user_name>.+)",
-                views.internal_advance_team,
-                name="advance-team",
-            ),
-            re_path(r"^internal/single_hint/(?P<id>.+)", puzzles.hint, name="hint"),
-            re_path(r"^internal/single_email/(?P<id>.+)", puzzles.email, name="email"),
-            re_path(
-                r"^internal/resend_emails", puzzles.resend_emails, name="resend-emails"
-            ),
-            re_path(
-                r"^internal/extraguessgrant/(?P<id>.+)",
-                puzzles.manage_extra_guess_grant,
-                name="guess-grant",
-            ),
-            re_path(r"^internal/email_main", views.email_main, name="email-main"),
-            re_path(r"^internal/all_emails", views.all_emails, name="all-emails"),
-            re_path(
-                r"^internal/errata_list", views.internal_errata, name="errata-list"
-            ),
-            re_path(
-                r"^internal/errata_email/(?P<errata_pk>.+)",
-                views.emails_for_errata,
-                name="errata-email",
-            ),
-            re_path(
-                r"^internal/errata_email_confirm",
-                views.email_confirm,
-                name="errata-email-confirm",
-            ),
-            path("internal/custom_email", views.custom_email, name="custom-email"),
-            path("internal/add_hint", puzzles.debug_hint),
-            path("internal/export_csv", views.activity_csv),
             # Puzzle-specific endpoints
             *[
                 path(f"api/puzzle/{slug}/{endpoint_url}", api_handler, {"slug": slug})
                 for slug, endpoints in PUZZLE_SPECIFIC_ENDPOINTS.items()
                 for endpoint_url, api_handler in endpoints
             ],
+            path("api/events", hunt.get_events),
+            path("api/unlock_everything", team.unlock_everything),
+            path("api/hunt_info", views.get_hunt_info),
+            path("api/hunt_site", views.get_hunt_site),
+            path("api/login", auth.log_in),
+            path("api/logout", auth.log_out),
+            # TODO: This can be deduped into a single endpoint for creating/reading/updating. See auth.register_individual
+            # path(r"api/register", auth.register),
+            not settings.IS_POSTHUNT
+            and re_path(r"^api/register/(?P<slug>[^//]+)$", auth.registration),
+            # path("api/register_individual", auth.register_individual),
+            path("api/registration_teams", team.registration_teams),
+            path("api/rounds", puzzles.get_rounds),
+            re_path(r"^api/rounds/(?P<round_slug>[^//]+)$", puzzles.puzzles_by_round),
+            path("api/puzzles", puzzles.puzzles_by_round),
+            path("api/puzzle_list", puzzles.get_puzzles_team_api),
+            path("api/story_state", story.update_story_state),
+            re_path(r"^api/story/(?P<slug>[^//]+)$", story.story_card),
+            path("api/story", story.story_cards),
+            re_path(
+                r"^api/dialogue/(?P<slug>[^//]+)/status$", story.get_dialogue_status
+            ),
+            re_path(r"^api/dialogue/(?P<slug>[^//]+)$", story.get_dialogue),
+            path("api/unsubscribe", team.unsubscribe),
+            re_path(r"^api/solve/(?P<slug>[^//]+)$", puzzles.solve),
+            re_path(r"^api/puzzle/(?P<slug>[^//]+)/hint$", puzzles.request_hint),
+            re_path(r"^api/puzzle/(?P<slug>[^//]+)$", puzzles.puzzle_data),
+            path(r"api/free_answer", puzzles.get_puzzles_for_free_answers),
+            re_path(r"^api/free_answer/(?P<slug>[^//]+)$", puzzles.free_answer),
+            path(r"api/free_a3_answer", puzzles.get_puzzles_for_free_a3_answers),
+            re_path(r"^api/free_a3_answer/(?P<slug>[^//]+)$", puzzles.free_a3_answer),
+            path(r"api/free_unlock", puzzles.get_rounds_for_free_unlock),
+            re_path(r"^api/free_unlock/(?P<slug>[^//]+)$", puzzles.free_unlock),
+            re_path(r"^api/stats/(?P<slug>[^//]+)$", views.stats_public),
+            re_path(r"^api/position/(?P<slug>[^//]+)$", puzzles.update_position),
+            re_path(
+                r"^api/interaction/(?P<slug>[^//]+)$", interactions.request_interaction
+            ),
+            path("api/guess_log", views.public_activity_csv),
+            path("api/server.zip", views.server_zip),
+            path("api/reset_local_database", views.reset_pyodide_db),
+            path("authorize", auth.authorize_view, name="authorize"),
+            # example puzzle page with copy-to-clipboard
+            path("clipboard", views.clipboard, name="clipboard"),
+            # special path only for Caddy to check whether the client should be allowed
+            # access to the requested resource based on progression
+            re_path(
+                r"^check/(?P<original_path>.*)$",
+                auth.check_access_allowed,
+            ),
+            # Staff endpoints that aren't tied to the default Django admin site.
+            re_path(
+                r"^internal/approve_picture/(?P<user_name>[^//]+)$",
+                views.approve_profile_pic,
+                name="approve_picture",
+            ),
+            re_path(r"^internal/?$", views.internal_home, name="internal_home"),
+            # TODO: once the hunt is over, switch to huntinfo/*
+            path("internal/finishers", views.finishers, name="finishers"),
+            path("internal/hunt_stats", views.hunt_stats, name="hunt-stats"),
+            # END-TODO
+            path(r"internal/hint_csv", puzzles.hint_csv, name="hint_csv"),
+            path(
+                "internal/unanswered_email_list",
+                puzzles.unanswered_email_list,
+                name="unanswered-email-list",
+            ),
+            re_path(
+                r"^internal/advanceteam/(?P<user_name>[^//]+)",
+                views.internal_advance_team,
+                name="advance-team",
+            ),
+            re_path(
+                r"^internal/extraguessgrant/(?P<id>[^//]+)$",
+                puzzles.manage_extra_guess_grant,
+                name="guess-grant",
+            ),
+            path("internal/email_main", views.email_main, name="email-main"),
+            path("internal/all_emails", views.all_emails, name="all-emails"),
+            path("internal/custom_email", views.custom_email, name="custom-email"),
+            path("internal/add_hint", puzzles.debug_hint),
+            path("internal/export_csv", views.activity_csv),
         ],
     )
 )
 
 if settings.SILK_ENABLED:
-    urlpatterns.append(url(r"^internal/silk/", include("silk.urls", namespace="silk")))
+    urlpatterns.append(
+        re_path(r"^internal/silk/", include("silk.urls", namespace="silk"))
+    )
 
 # serves media files in dev. Otherwise, Caddy serves them
 urlpatterns.extend(static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT))
@@ -139,3 +142,10 @@ if settings.DEBUG:
     urlpatterns.append(path("robots.txt", views.robots))
 else:
     handler404 = "puzzles.views.views.handler404"
+
+urlpatterns.extend(
+    [
+        path("admin/", admin.site.urls),
+        path("spoilr/", include("spoilr.urls")),
+    ]
+)

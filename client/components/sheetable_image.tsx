@@ -7,9 +7,10 @@ import { HIDDEN_CLASS, NO_COPY_CLASS } from 'components/copy';
  * Generate an image that can be pasted into Google Sheets with the Copy to
  * Clipboard button.
  *
- * This works by inserting a Sheets formula to the static image when copied.
- * Note that images will not show in Sheets in dev because Google cannot load
- * from localhost.
+ * NOTE: with the implementation of copyjack this component is mostly unnecessary.
+ * The main usage for this is to specify a copySrc that is distinct from the
+ * rendered image on the website; for example, if you want to show SVGs but copy
+ * PNGs, since SVGs are not supported in Google Sheets.
  *
  * When using, you should make sure that the formula will get its own cell, for
  * example by putting the <SheetableImage/> in a <td/> or <div/>.
@@ -20,7 +21,7 @@ import { HIDDEN_CLASS, NO_COPY_CLASS } from 'components/copy';
 interface SheetableImageProps
   extends React.ImgHTMLAttributes<HTMLImageElement> {
   copySrc?: string;
-  hiddenProps?: React.HTMLProps<HTMLSpanElement>;
+  hiddenProps?: React.ImgHTMLAttributes<HTMLImageElement>;
 }
 
 const SheetableImage: React.FC<SheetableImageProps> = ({
@@ -28,24 +29,27 @@ const SheetableImage: React.FC<SheetableImageProps> = ({
   src,
   copySrc,
   hiddenProps = {},
+  children,
   ...props
 }) => {
-  const absSrc = useMemo<string | undefined>(() => {
-    const _src = copySrc ?? src;
-    return typeof window === 'undefined'
-      ? _src
-      : _src && new URL(_src, window.location.href).href;
-  }, [src, copySrc]);
-
   return (
     <>
-      <img src={src} className={cx(className, NO_COPY_CLASS)} {...props} />
-      {absSrc && (
-        <span
+      {children === undefined ? (
+        <img
+          src={src}
+          className={cx(className, { [NO_COPY_CLASS]: !!copySrc })}
+          {...props}
+        />
+      ) : (
+        children
+      )}
+      {copySrc && (
+        <img
+          src={copySrc}
           className={HIDDEN_CLASS}
-          suppressHydrationWarning
+          {...props}
           {...hiddenProps}
-        >{`=IMAGE("${absSrc}")`}</span>
+        />
       )}
     </>
   );

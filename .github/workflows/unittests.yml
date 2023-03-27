@@ -1,0 +1,64 @@
+name: unittests
+
+env:
+  # FIXME: Change these to your own container registry
+  CI_REGISTRY: registry.gitlab.com
+  CI_REGISTRY_IMAGE: registry.gitlab.com/teammate/mh-2023/mh-2023
+
+on:
+  workflow_call:
+    inputs:
+      BUILD_SITE:
+        # '':  hunt
+        # 'reg': reg
+        # 'hunt-reg': combined
+        type: string
+
+jobs:
+  unittests:
+    name: Run unittests
+    # only run unittests on our own machines
+    runs-on: [self-hosted, ubuntu-latest]
+    steps:
+      - name: Install docker-compose
+        run: pip install docker-compose
+      - name: Set env
+        run: |-
+          export BUILD_SITE=${{ inputs.BUILD_SITE }}
+          export IMAGE_PREFIX="${BUILD_SITE:+${BUILD_SITE}-}"
+          export CI_COMMIT_SHORT_SHA=${GITHUB_SHA::8}
+          export CI_COMMIT_REF_SLUG=${GITHUB_REF_NAME//[^[:alnum:]_]/-}
+          export IMAGE_TAG_SHA=$CI_REGISTRY_IMAGE:${IMAGE_PREFIX}sha-$CI_COMMIT_SHORT_SHA
+          export TEST_DIR=${CI_COMMIT_REF_SLUG}_${CI_COMMIT_SHORT_SHA}
+          # Export env to be reused in later steps. Like `env >> $GITHUB_ENV` but works with multiline values
+          env -0 | tr '\n' '\r' | tr '\0' '\n' | cut -s -d'=' -f1 | xargs -I{} sh -c 'printf "{}<<ENV_EOF\n%s\nENV_EOF\n" "${}"' >> $GITHUB_ENV
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Copy files
+        run: >-
+          mkdir $TEST_DIR
+          && cp -r
+          docker-compose.yml
+          deploy/docker-compose.unittests.yml
+          scripts
+          $TEST_DIR/
+      - name: Pull image
+        run: |-
+          cd $TEST_DIR
+          cat <<ENV > .env
+          SERVER_ENVIRONMENT=staging
+          IMAGE_TAG=$IMAGE_TAG_SHA
+          ENV
+          docker login -u ${{ secrets.CI_REGISTRY_USER }} -p ${{ secrets.CI_REGISTRY_PASSWORD }} $CI_REGISTRY
+          docker-compose -f docker-compose.yml -f docker-compose.unittests.yml pull
+      - name: Run tests
+        run: |-
+          cd $TEST_DIR
+          docker-compose -f docker-compose.yml -f docker-compose.unittests.yml up --exit-code-from tph --force-recreate
+      - name: Remove image
+        # try to run even if a previous step failed
+        if: always()
+        run: |-
+          cd $TEST_DIR
+          docker-compose down
+          docker rmi -f $IMAGE_TAG_SHA

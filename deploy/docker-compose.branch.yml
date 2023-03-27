@@ -1,0 +1,29 @@
+# This docker compose override file is used for Github CI/CD deployments
+version: '3.7'
+
+services:
+  db:
+    hostname: db-${COMMIT_REF_SLUG}
+    # exit immediately
+    command: /bin/true
+    restart: 'no'
+  redis:
+    hostname: redis-${COMMIT_REF_SLUG}
+    # exit immediately
+    command: /bin/true
+    restart: 'no'
+  tph:
+    image: ${IMAGE_TAG}
+    hostname: branch-${COMMIT_REF_SLUG}
+    env_file: .env
+    environment:
+      - ENABLE_BACKEND=false
+      - SERVE_FIXTURES=true
+    networks:
+      - branch_server_network
+    labels:
+      - com.tph.is_test_branch
+
+networks:
+  branch_server_network:
+    name: branch_server_network

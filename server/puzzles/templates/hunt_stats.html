@@ -59,7 +59,7 @@
         </tr>
         {% for row in data %}
         <tr>
-            <td sorttable_customkey="{{ forloop.counter }}" {% if row.puzzle.is_meta %}class="meta"{% endif %}><a href="/stats/{{row.puzzle.solution_slug}}">{{ row.puzzle.name }}</a></td>
+            <td sorttable_customkey="{{ forloop.counter }}" {% if row.puzzle.is_meta %}class="meta"{% endif %}><a href="/stats/{{row.puzzle.slug}}">{{ row.puzzle.name }}</a></td>
             {% for number in row.numbers %}
             <td {% if forloop.counter > 3 %}style="background-color: rgba(255, 255, 255, calc({{ number }} / {{ row.numbers|first }} / 2));"{% endif %}>{{ number }}</td>
             {% endfor %}

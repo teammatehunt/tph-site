@@ -1,60 +1,32 @@
 # vim: filetype=caddyfile
 
 {
+    log {
+        level warn
+        output file /srv/logs/caddy-internal.log
+    }
+    servers {
+        metrics
+    }
     storage file_system {
         root /srv
     }
 }
 
-# snippet to serve files after checking auth
-(serve) {
-    # matchers are defined prior to snippet
-
-    route {
-        reverse_proxy @django       localhost:8000
-
-        # blocked resources should return 404 instead
-        respond @blocked 404
-
-        header @team_media {
-            # Don't let proxies transform or compress team pictures
-            Cache-Control "no-transform"
-        }
-        header @site_media {
-            # Site media should have uuids (but this is not enforced)
-            # cache for 2 weeks
-            Cache-Control "public, max-age=1209600"
-        }
-        file_server @media {
-            root /srv # these are user-uploaded media and are persisted at /srv/media
-        }
-        header @static_immutable {
-            # cache for 2 weeks
-            Cache-Control "public, max-age=1209600, immutable"
-        }
-        file_server @static {
-            root /static # these are generated and collected static files at /static
-            precompressed br gzip # needs Caddy v2
-        }
-
-        # proxy everything else to the frontend on port 3000
-        reverse_proxy               localhost:3000
-    }
+# FIXME: update if you want to use basicauth : try `caddy hash-password`
+# snippet for basicauth
+(basicauth_hash) {
+    # admin FIXMEpassword
+    {$ADDITIONAL_BASICAUTH}
 }
 
+(basicauth_metrics) {
+    # admin FIXMEpassword
+}
 
-# server configuration
-{$CADDY_PROTOCOL}{$SERVER_HOSTNAME} {
-    log {
-        output file /srv/logs/caddy.log
-    }
-
-    encode zstd gzip
-
+# snippet to define matchers
+(define_matchers) {
     @static {
-        file {
-            root /static
-        }
         path /static/*
         path /_next/static/*
 
@@ -74,72 +46,442 @@
         path /pyodide/*
     }
 
-    # matchers
+    # protect the staging site with basicauth
+    @protect_on_staging {
+        not expression {env.SERVER_ENVIRONMENT}.matches("prod|posthunt")
 
+        # exclude static paths
+        not path /static/*
+        not path /media/*
+        not path /_next/static/*
+        not path /banner.png
+        not path /favicon.ico
+        not path /mh2023_activity_log.csv
+    }
+
+    # these endpoints are targets for prometheus and are protected by basicauth
+    @metrics {
+        path /metrics           # django metrics
+        path /caddy_metrics     # caddy metrics
+    }
+
+    # test branches
+    @test_branch {
+        expression {env.SERVER_ENVIRONMENT}.matches("test_branch") && size({http.request.host.labels.3}) > 0
+    }
+
+    # file checking matchers
+    @srv_file_exists {
+        # NB: this should not be used without another matcher as there are
+        # secrets in this directory too
+        file {
+            root /srv
+        }
+    }
+
+    @static_file_exists {
+        file {
+            root /static/{vars.site_static}
+        }
+    }
+
+    @invalid_file_method {
+        not method GET HEAD OPTIONS
+    }
+    @options {
+        method OPTIONS
+    }
+
+    # things to be sent to Django that may need to be gated by @needs_check
+    @django {
+        # not (not A and not B and not C) is equivalent to A or B or C
+        not {
+            # django paths for all sites
+            not {
+                path /authorize
+                path /clipboard
+            }
+            # django paths for registration only
+            not {
+                vars {vars.site_type} registration
+                # allowlist for registration site api paths
+                # NB: keep in sync with Caddyfile.dev
+                path /api/hunt_info
+                path /api/login
+                path /api/logout
+                path /api/register
+                path /api/register/*
+                path /api/register_individual
+                path /api/request_reset
+                path /api/reset_password
+                path /api/unsubscribe
+                path /api/validate_token
+            }
+            # django paths for hunt site only
+            not {
+                vars {vars.site_type} hunt
+                # main site apis and websockets are authenticated on the backend
+                path /api/*
+                path /ws/*
+            }
+        }
+    }
+
+    # things to be sent to Django that don't need to be gated by @needs_check
     @django_admin {
         path /admin
         path /admin/*
+        path /huntinfo/*
         path /impersonate/*
         path /internal
         path /internal/*
-        path /huntinfo/*
+        path /metrics
+        path /spoilr
+        path /spoilr/*
     }
 
     # TODO: we may want to hide things like certain API endpoints as well
     @needs_check {
+        # keep in sync with Caddyfile.dev
+        path /login
+        path /puzzles
         path /puzzles/*
         path /hints/*
         path /solutions/*
         path /internal_frontend/*
-        path /_next/static/assets/solution/*
-        path /_next/static/assets/victory/*
         path /victory
+        path /rounds/*
     }
 
-    @django {
-        path /api/*
-        path /ws/*
-        path /clipboard
+    @uploads {
+        path /uploads/*
     }
-
-    @media {
-        file {
-            root /srv
-        }
+    @media_assets {
+        # static site media like puzzle icons and storycard images
         path /media/*
     }
-    @team_media {
-        # team related media like profile pictures
-        file {
-            root /srv
-        }
-        path /media/team/*
-    }
-    @site_media {
-        # static site media like puzzle icons and storycard images
-        file {
-            root /srv
-        }
-        path /media/site/*
+
+}
+
+(global_toplevel) {
+    log {
+        output file /srv/logs/caddy.log
     }
 
-    @blocked {
-        path /static/staticfiles.json
+    encode zstd gzip
+
+    import define_matchers
+}
+
+(global_directives) {
+    # CORS - needed for js to be able to interact with assets (eg, canvas)
+    # NB: also needed for basicauth to work
+    header @static {
+        import cors_headers
+    }
+    header @media_assets {
+        import cors_headers
+    }
+    header @uploads {
+        import cors_headers
     }
 
+    # FIXME: Uncomment if you want to protect the staging site with basicauth
+    # (and add valid logins under the basicauth_hash snippet).
+    # basicauth @protect_on_staging {
+    #     import basicauth_hash
+    # }
+
+    # hide metrics behind basicauth
+    basicauth @metrics {
+        import basicauth_metrics
+    }
+
+}
+
+(global) {
+    import global_toplevel
+    import global_directives
+}
+
+(cors_headers) {
+    Access-Control-Allow-Origin *
+    Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+    Access-Control-Max-Age 3600
+}
+
+(file_server_settings) {
+    error @invalid_file_method 400
+    header @options Cache-Control "public, max-age=3600"
+    respond @options 204
+    # By default, set max-age to 5 seconds. Can still be cached longer if validated.
+    # This affects content served from files (including 404 errors).
+    # Matchers for files with hashed filenames should definitely override this
+    # to be longer, and matchers for files with human filenames might want to
+    # override this to be somewhat longer.
+    header Cache-Control "public, max-age=5"
+}
+
+# snippet to serve files after checking auth
+(serve_no_auth_needed) {
+    # matchers are defined prior to snippet
+
+    route {
+        reverse_proxy @django localhost:8000 {
+            rewrite {vars.basepath}{path}
+            header_up X-TPH-SITE {vars.site}
+        }
+
+        # serve files
+        route @static {
+            import file_server_settings
+            route @static_file_exists {
+                # cache changable files for 15 seconds
+                header Cache-Control "public, max-age=15"
+                # cache hashed immutable files for 2 weeks
+                header @static_immutable Cache-Control "public, max-age=1209600, immutable"
+                file_server {
+                    root /static/{vars.site_static}
+                    hide /static/{vars.site_static}/static/staticfiles.json
+                    precompressed br gzip # needs Caddy v2
+                }
+            }
+        }
+        route @media_assets {
+            import file_server_settings
+            route @srv_file_exists {
+                # Media assets are hashed by the sync_media script. Cache for 2 weeks
+                header Cache-Control "public, max-age=1209600, immutable"
+                file_server {
+                    root /srv
+                }
+            }
+        }
+        route @uploads {
+            import file_server_settings
+            route @srv_file_exists {
+                # these are user-uploaded media and are persisted at /srv/uploads
+                # cache changable files for 15 seconds
+                header Cache-Control "public, max-age=15"
+                file_server {
+                    root /srv
+                }
+            }
+        }
+
+        # Proxy test branch frontend and not-found static files
+        # host is `{branch}.branch.teammatehunt.com`
+        reverse_proxy @test_branch branch-{http.request.host.labels.3}:{vars.branch_port}
+
+        # 404 files not found
+        error @static 404
+        error @media_assets 404
+        error @uploads 404
+
+        # proxy everything else to the frontend port
+        reverse_proxy localhost:{vars.frontend_port} {
+            rewrite {vars.basepath}{path}
+            header_up X-TPH-SITE {vars.site}
+        }
+    }
+}
+
+# snippet for serving while checking auth
+(serve) {
     # `route` prevents Caddy from reordering the directives under it
     route {
-        reverse_proxy @django_admin localhost:8000
-        route @needs_check {
-            rewrite * /check{path}
-            reverse_proxy localhost:8000 {
-                @accel header X-Accel-Redirect *
-                handle_response @accel {
-                    rewrite * {http.reverse_proxy.header.X-Accel-Redirect}
-                    import serve
-                }
+        metrics /caddy_metrics
+        reverse_proxy @django_admin localhost:8000 {
+            rewrite {vars.basepath}{path}
+            header_up X-TPH-SITE {vars.site}
+        }
+        reverse_proxy @needs_check localhost:8000 {
+            rewrite {vars.basepath}/check{path}
+            header_up X-TPH-SITE {vars.site}
+            @accel header X-Accel-Redirect *
+            handle_response @accel {
+                rewrite * {http.reverse_proxy.header.X-Accel-Redirect}
+                import serve_no_auth_needed
+            }
+        }
+        import serve_no_auth_needed
+    }
+}
+
+(main_entrypoint_directives) {
+    handle {
+        import global_directives
+        route @test_branch {
+            file_server @static {
+                root /static/{vars.site_static}
+                precompressed br gzip
+            }
+            reverse_proxy localhost:{vars.frontend_port} {
+                header_up X-TPH-SITE {vars.site}
             }
         }
         import serve
     }
+}
+
+# snippet for the main reverse proxy
+(main_entrypoint) {
+    import global_toplevel
+    import main_entrypoint_directives
+}
+
+# server configuration
+{$CADDY_HUNT_HOST:http://no-hunt} {
+    vars {
+        frontend_port 3000
+        site hunt
+        site_static hunt
+        site_type hunt
+    }
+    import main_entrypoint
+}
+{$CADDY_REGISTRATION_HOST:http://no-registration} {
+    vars {
+        frontend_port 3002
+        site registration
+        site_static registration
+        site_type registration
+    }
+    import main_entrypoint
+}
+# FIXME: update paths
+{$CADDY_POSTHUNT_HOST:http://no-posthunt} {
+    @posthunt_hunt {
+        path /2023/mypuzzlehunt.com
+        path /2023/mypuzzlehunt.com/*
+    }
+    @posthunt_registration {
+        path /2023/registration.mypuzzlehunt.com
+        path /2023/registration.mypuzzlehunt.com/*
+    }
+    @posthunt_hunt_clientnav {
+        path_regexp ^/2023/_next/data/[^/]*/interestingthings\.museum/
+    }
+    @posthunt_root {
+        path /2023
+        path /2023/*
+        not {
+            path /2023/mypuzzlehunt.com
+            path /2023/mypuzzlehunt.com/*
+            path /2023/mypuzzlehunt2.com
+            path /2023/mypuzzlehunt2.com/*
+            path /2023/registration.mypuzzlehunt.com
+            path /2023/registration.mypuzzlehunt.com/*
+        }
+        not path_regexp ^/2023/_next/data/[^/]*/mypuzzlehunt\.com/
+        not path_regexp ^/2023/_next/data/[^/]*/mypuzzlehunt2\.com/
+    }
+    vars @posthunt_hunt {
+        frontend_port 3000
+        site museum
+        site_static posthunt
+        site_type hunt
+        basepath /2023/mypuzzlehunt.com
+    }
+    vars @posthunt_registration {
+        frontend_port 3002
+        site registration
+        site_static registration
+        site_type registration
+        basepath /2023/registration.mypuzzlehunt.com
+    }
+    vars @posthunt_hunt_clientnav {
+        frontend_port 3000
+        site museum
+        site_static posthunt
+        site_type hunt
+        basepath /2023
+    }
+    vars @posthunt_root {
+        frontend_port 3000
+        site hunt
+        site_static posthunt
+        site_type hunt
+        basepath /2023
+    }
+
+    # combined posthunt needs special routing, so have to split main_entrypoint
+    import global_toplevel
+
+    # Placeholders don't work with uri strip_prefix for some reason.
+    handle @posthunt_hunt {
+        uri strip_prefix /2023/mypuzzlehunt.com
+        import main_entrypoint_directives
+    }
+    handle @posthunt_registration {
+        uri strip_prefix /2023/registration.mypuzzlehunt.com
+        import main_entrypoint_directives
+    }
+    handle @posthunt_hunt_clientnav {
+        uri strip_prefix /2023
+        import main_entrypoint_directives
+    }
+    handle @posthunt_root {
+        uri strip_prefix /2023
+        import main_entrypoint_directives
+    }
+    # redirect posthunt domain root to 2023 landing page
+    handle / {
+        redir * /2023
+    }
+    error 404
+}
+
+# list of www. subdomains to redirect
+{$WWW_REDIRECT:http://no-www} {
+    # TODO: check caddy can do https to https with both certs
+    @hostnames header_regexp host Host ^www\.(?P<root>.*)$
+    handle @hostnames {
+        redir {scheme}://{re.host.root}{uri} permanent
+    }
+    error 404
+}
+
+# snippet for the branch backend reverse proxy
+(branch_backend_entrypoint) {
+    tls {
+        dns duckdns {$DUCKDNS_API_TOKEN:invalid-token} {
+            override_domain challenge-teammatehunt.duckdns.org
+        }
+        resolvers 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4
+    }
+    import global
+    handle @test_branch {
+        import serve
+    }
+    error 404
+}
+
+# subdomain configuration for test branches only
+{$CADDY_BRANCH_HOSTNAME:http://caddy-unused-if-not-branch-backend} {
+    vars {
+        branch_port 80
+        frontend_port 3000
+        site museum
+        site_type hunt
+    }
+    import branch_backend_entrypoint
+}
+{$CADDY_BRANCH_HOSTNAME:http://caddy-unused-if-not-branch-backend}:8082 {
+    vars {
+        branch_port 8071
+        frontend_port 3000
+        site factory
+        site_type hunt
+    }
+    import branch_backend_entrypoint
+}
+{$CADDY_BRANCH_HOSTNAME:http://caddy-unused-if-not-branch-backend}:8083 {
+    vars {
+        branch_port 8072
+        frontend_port 3002
+        site registration
+        site_type hunt
+    }
+    import branch_backend_entrypoint
 }

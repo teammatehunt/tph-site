@@ -1,7 +1,7 @@
-import ReactDOM from 'react-dom';
+import React, { forwardRef } from 'react';
 import ReactTwemoji from 'react-twemoji';
 import { HIDDEN_CLASS, NO_COPY_CLASS } from 'components/copy';
-import { forwardRef, useEffect, useRef, useState } from 'react';
+import cx from 'classnames';
 
 interface TwemojiOptions {
   size?: number | string;
@@ -16,6 +16,7 @@ interface TwemojiProps {
   options?: TwemojiOptions;
   tag?: string;
   children?: React.ReactNode;
+  className?: string;
 }
 
 /**
@@ -23,16 +24,18 @@ interface TwemojiProps {
  * see on Discord. This ensures that puzzle content is consistent regardless of
  * the browser. See https://twemoji.twitter.com/ for more details.
  *
- * This is a wrapper around react-twemoji which uses images to render emoji
- * on the page, but ensures that copy-to-clipboard copies the actual unicode.
+ * By default, copy-to-clipboard copies the image, not the unicode.
+ * For the latter, use <CopyableTwemoji> with the copyUnicodeEmoji option enabled.
  */
 const Twemoji = forwardRef<HTMLImageElement, TwemojiProps>(
   ({ emoji = undefined, options = undefined, children, ...props }, ref) => (
     <>
       <ReactTwemoji
-        className={NO_COPY_CLASS}
         ref={ref}
-        options={options}
+        options={{
+          base: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/',
+          ...options,
+        }}
         {...props}
       >
         {emoji}
@@ -45,7 +48,6 @@ const Twemoji = forwardRef<HTMLImageElement, TwemojiProps>(
           width: 1em;
           vertical-align: middle;
         }
-
         span {
           vertical-align: middle;
         }
@@ -54,45 +56,40 @@ const Twemoji = forwardRef<HTMLImageElement, TwemojiProps>(
   )
 );
 
-export const CopyableTwemoji = ({
+export const CopyableTwemoji: React.FC<TwemojiProps> = ({
   emoji,
+  className,
   options = {} as TwemojiOptions,
   ...props
 }) => {
-  const [absSrc, setAbsSrc] = useState<string>('');
-  const ref = useRef<HTMLImageElement>(null);
-
-  useEffect(() => {
-    if (ref.current) {
-      // Because react-twemoji doesn't forwardRef, we have to grab the DOM node
-      // manually.
-      const rootEl = ReactDOM.findDOMNode(ref.current);
-      if (rootEl?.firstChild && 'src' in rootEl.firstChild) {
-        setAbsSrc((rootEl.firstChild as HTMLImageElement).src);
-      }
-    }
-  }, []);
-
   return (
     <>
       <Twemoji
-        ref={ref}
         emoji={emoji}
-        options={{
-          ...(options || {}),
-          // Don't render the Twemoji when copy-pasting
-          className: `${NO_COPY_CLASS} emoji`,
-        }}
+        options={options}
+        className={cx(className, {
+          // Don't render the text when copy-pasting if unicode enabled
+          [NO_COPY_CLASS]: options.copyUnicodeEmoji,
+        })}
         {...props}
       />
-      {/* Render image formula with Twemoji url for sheets. */}
-      {(absSrc || options.copyUnicodeEmoji) && (
-        <span className={HIDDEN_CLASS}>
-          {options.copyUnicodeEmoji ? emoji : `=IMAGE("${absSrc}")`}
-        </span>
+      {/* Render unicode emoji if enabled */}
+      {options.copyUnicodeEmoji && (
+        <span className={HIDDEN_CLASS}>{emoji}</span>
       )}
     </>
   );
 };
+
+export const InlineTwemoji: React.FC<{
+  emoji?: string;
+  copyImage?: boolean;
+}> = ({ emoji, copyImage = false, children }) => (
+  <CopyableTwemoji
+    tag="span"
+    emoji={emoji ?? children ?? undefined}
+    options={{ className: 'emoji inline-block', copyUnicodeEmoji: !copyImage }}
+  />
+);
 
 export default Twemoji;

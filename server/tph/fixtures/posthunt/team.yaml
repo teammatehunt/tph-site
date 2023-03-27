@@ -1,0 +1,25 @@
+- model: spoilr_core.team
+  pk: 1
+  fields:
+    username: public
+    name: Your Team Name
+    slug: public
+    type: public
+    creation_time: 2023-01-13T20:00:00Z
+- model: puzzles.team
+  pk: 1
+  fields:
+    name: public
+    creation_time: 2023-01-13T20:00:00Z
+- model: spoilr_core.user
+  pk: 1
+  fields:
+    username: public
+    team: 1
+    team_role: shared
+    date_joined: 2023-01-13T20:00:00Z
+- model: puzzles.storystate
+  pk: 1
+  fields:
+    team: 1
+    state: 800

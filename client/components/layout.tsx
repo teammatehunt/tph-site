@@ -1,152 +1,28 @@
-import React, {
-  FunctionComponent,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import Link, { LinkProps } from 'next/link';
-import { useRouter } from 'next/router';
-import { Menu } from 'react-feather';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import { MenuIcon } from '@heroicons/react/outline';
+import { useRouter } from 'utils/router';
 import cx from 'classnames';
+import dynamic from 'next/dynamic';
 
 import HuntInfoContext from 'components/context';
-import LoginForm from 'components/login';
-import RegisterForm from 'components/register';
+import MuseumTheme from 'components/themes/museum';
+import NavbarLink from 'components/navbar';
+import VolumeSlider from 'components/volume_slider';
+import ResetLocalDatabaseButton from 'components/reset_local_database_button';
 
-/** FIXME: Customize themes here and include them below. */
-const DarkTheme = () => (
-  <style global jsx>{`
-    :root {
-      --theme-translucent: rgba(0, 0, 0, 0.8);
-    }
-
-    body {
-      background: linear-gradient(to bottom, var(--dark), transparent);
-    }
-    h1 {
-      text-shadow: 4px 4px 0px rgba(222, 197, 125, 0.25);
-    }
-  `}</style>
-);
-
-const LightTheme = () => (
-  <style global jsx>{`
-    body {
-      background-image: linear-gradient(
-        0.25turn,
-        var(--background-transparent),
-        var(--background),
-        var(--background-transparent)
-      );
-      background-size: 100%, 400px;
-      background-repeat: no-repeat, repeat;
-    }
-  `}</style>
-);
-
-interface NavbarLinkProps extends LinkProps {
-  linkText: string;
-  truncate?: boolean;
-  floatRight?: boolean;
-  smallCaps?: boolean;
+interface Props {
+  children?: React.ReactNode;
 }
-
-/** A link in the top navbar. */
-const NavbarLink: FunctionComponent<NavbarLinkProps> = ({
-  linkText,
-  truncate,
-  floatRight,
-  smallCaps = true,
-  ...props
-}) => {
-  const router = useRouter();
-  const isSelected =
-    props.href === router.pathname && (!props.as || props.as === router.asPath);
-
-  return (
-    <li
-      className={cx({
-        'small-caps': smallCaps,
-        selected: isSelected,
-        truncate,
-      })}
-    >
-      {isSelected || !props.href ? (
-        <div className="link">
-          <strong>{linkText}</strong>
-        </div>
-      ) : (
-        <Link {...props}>
-          <a title={linkText}>
-            <div className="link">
-              <strong>{linkText}</strong>
-            </div>
-          </a>
-        </Link>
-      )}
-      <style jsx>{`
-        li {
-          list-style: none;
-          margin-left: ${floatRight ? 'auto' : '8px'};
-          margin-right: 8px;
-          padding-left: 4px;
-          padding-right: 4px;
-        }
-
-        li.selected {
-          color: var(--primary);
-          text-decoration: underline;
-          text-underline-offset: 4px;
-        }
-
-        div.link {
-          /* padding on top for links in <NavbarLink/> so the clickable area
-           * spans to the top, but we use additional margin for the <hr/> */
-          padding-top: 12px;
-        }
-
-        a {
-          color: var(--primary);
-        }
-
-        a:not(:hover) {
-          text-decoration: none;
-        }
-
-        .truncate {
-          min-width: 120px;
-        }
-
-        @media (max-width: 800px) {
-          div.link {
-            padding-top: 0;
-          }
-
-          li {
-            margin-block: 6px;
-            margin-left: 0;
-          }
-
-          :global(.collapsed) li {
-            display: ${isSelected ? 'list-item' : 'none'};
-          }
-        }
-      `}</style>
-    </li>
-  );
-};
 
 /**
  * The layout component, rendered on every page. Controls the rendering of the
  * navbar as well as global page styling (e.g. color schemes).
  */
-const Layout: React.FC = ({ children }) => {
+const Layout: React.FC<Props> = ({ children }) => {
   const router = useRouter();
-  const { huntInfo, userInfo } = useContext(HuntInfoContext);
+  const { huntInfo, userInfo, round } = useContext(HuntInfoContext);
   const [isNavbarCollapsed, setNavbarCollapsed] = useState<boolean>(true);
-  const loggedIn = !!userInfo?.teamInfo;
+  const teamInfo = userInfo?.teamInfo;
   const [isScrolled, setScrolled] = useState<boolean>(false);
 
   const basePath = router.asPath.split('#')[0]; // grab the path before hash
@@ -173,51 +49,75 @@ const Layout: React.FC = ({ children }) => {
     };
   }, [router.events]);
 
-  const themeStyle = useMemo(() => {
-    // FIXME: set up theme variants here.
-    const theme = 'light';
-    switch (theme) {
-      default:
-        return <LightTheme />;
-    }
-  }, []);
+  // Customize styles based on round.
+  const themeStyle = <MuseumTheme roundSlug={round.slug} />;
 
   const prehunt = huntInfo.secondsToStartTime > 0;
+  let loginUrl = '/login';
+  if (!['/login', '/'].includes(router.pathname)) {
+    loginUrl += `?next=${encodeURIComponent(router.asPath)}`;
+  }
 
   return (
     <>
-      <div className="nav-container">
+      {/* gradient should not be clickable */}
+      <div className="nav-container pointer-events-none fixed top-0">
         <nav
-          className={cx({ scrolled: isScrolled, collapsed: isNavbarCollapsed })}
+          className={cx('select-none print:hidden', {
+            scrolled: isScrolled,
+            collapsed: isNavbarCollapsed,
+          })}
         >
           <button
-            className="collapse-menu"
+            className="border-none md:hidden collapse-menu mt-2 print:hidden"
             aria-expanded={!isNavbarCollapsed}
-            onClick={() =>
-              setNavbarCollapsed((_isNavbarCollapsed) => !_isNavbarCollapsed)
-            }
+            onClick={() => setNavbarCollapsed((collapsed) => !collapsed)}
           >
-            <Menu />
+            <MenuIcon className="h-6 w-6" />
           </button>
 
           <div className="nav-list">
-            <ul>
-              <NavbarLink href="/" linkText={prehunt ? 'Home' : 'Puzzles'} />
-              <NavbarLink href="/story" linkText="Story" />
-              <NavbarLink href="/leaderboard" linkText="Teams" />
-              <NavbarLink href="/rules" linkText="Rules" />
-              <NavbarLink href="/faq" linkText="FAQ" />
-              {prehunt ? null : (
-                <NavbarLink href="/puzzles" linkText="List of Puzzles" />
+            <ul className="inline-flex">
+              <NavbarLink href="/" linkText="Home" />
+              {!(prehunt && !userInfo?.superuser) && teamInfo?.rounds && (
+                <NavbarLink
+                  linkText="Rounds"
+                  dropdownItems={
+                    teamInfo?.rounds?.map((act) =>
+                      act.map((roundData) => ({
+                        href: roundData.url,
+                        linkText: roundData.name,
+                      }))
+                    ) ?? []
+                  }
+                />
               )}
-              {(userInfo?.errata?.length ?? 0) > 0 && (
-                <NavbarLink href="/updates" linkText="Errata" />
-              )}
-              <NavbarLink href="/wrapup" linkText="Wrap-up" />
-              {/* FIXME: Link to archive if you have one. */}
-              {/*<NavbarLink href="/FIXME" linkText="Archive" />*/}
-              {/* TODO: only show after hunt starts */}
-              {/*<NavbarLink href="/puzzles" linkText="Puzzles" />*/}
+              <NavbarLink
+                linkText="Hunt"
+                dropdownItems={[
+                  ...(prehunt && !userInfo?.superuser
+                    ? []
+                    : [[{ href: '/puzzles', linkText: 'List of Puzzles' }]]),
+                  [
+                    { href: '/story', linkText: 'Story' },
+                    { href: '/about', linkText: 'About' },
+                    { href: '/events', linkText: 'Events' },
+                    { href: '/sponsors', linkText: 'Sponsors' },
+                    {
+                      href: '/health_and_safety',
+                      linkText: 'Health & Safety',
+                    },
+                    // FIXME: Enable as needed
+                    /*{
+                      href:
+                        router.nextRouter.basePath + '/spoilr/progress/solves',
+                      linkText: 'Hunt Stats',
+                    },
+                    { href: '/credits', linkText: 'Credits' },
+                   */
+                  ],
+                ]}
+              />
               {userInfo?.unlocks?.map((unlock) => (
                 <NavbarLink
                   key={unlock.url}
@@ -226,42 +126,34 @@ const Layout: React.FC = ({ children }) => {
                 />
               ))}
 
-              <hr />
-              {userInfo?.teamInfo && (
+              {!!teamInfo ? (
                 <>
-                  <NavbarLink
-                    href={`/team/${userInfo.teamInfo.slug}`}
-                    linkText={userInfo.teamInfo.name}
-                    floatRight
-                    truncate
-                    smallCaps={false}
-                  />
-                  {userInfo.isImpersonate && (
-                    <a href="/impersonate/stop" title="Stop impersonating">
-                      (🕵️)
-                    </a>
+                  {!process.env.isArchive && (
+                    <NavbarLink
+                      linkText={teamInfo.name}
+                      truncate
+                      dropdownItems={[
+                        [{ href: '/logout', linkText: 'Logout' }],
+                      ]}
+                    />
                   )}
                 </>
-              )}
-              {loggedIn ? (
-                <NavbarLink href="/logout" linkText="Logout" />
               ) : (
-                <>
-                  <NavbarLink href="/login" linkText="Login" floatRight />
-                  <NavbarLink href="/register" linkText="Sign up" />
-                </>
+                <NavbarLink href={loginUrl} linkText="Login" />
               )}
+
+              {process.env.useWorker && <ResetLocalDatabaseButton />}
+
+              <div className="grow" />
+              <VolumeSlider />
             </ul>
           </div>
         </nav>
       </div>
-      <div>{children}</div>
+      {children}
 
       <style jsx>{`
         .nav-container {
-          pointer-events: none; /* gradient should not be clickable */
-          position: sticky;
-          top: 0;
           left: 0;
           right: 0;
           z-index: 1000; /* Show above other content */
@@ -270,26 +162,10 @@ const Layout: React.FC = ({ children }) => {
         nav {
           background: var(--navbar);
           pointer-events: initial;
-          user-select: none;
-        }
-
-        .collapse-menu {
-          display: none;
-        }
-
-        hr {
-          border-color: var(--secondary);
-          color: var(--secondary);
-          border-bottom: none;
-          height: 1px;
-          margin: 24px 24px 12px 24px;
-          flex-grow: 1;
         }
 
         ul {
-          display: inline-flex;
           margin: 0 16px;
-          padding: 0;
           width: calc(100% - 32px);
         }
 
@@ -297,33 +173,36 @@ const Layout: React.FC = ({ children }) => {
           min-height: calc(100vh - 16px);
         }
 
-        /* Responsive navbar for small devices. */
+        /* Responsive navbar: show on small devices */
         @media (max-width: 800px) {
-          nav-container {
+          .nav-container {
             position: fixed;
           }
 
           nav {
-            display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
             background-color: transparent;
           }
 
-          hr {
-            margin: 12px;
+          nav :global(.menu) {
+            position: initial;
           }
 
           ul {
             position: absolute;
             padding-inline: 6px;
             background-color: var(--theme-translucent);
-            border: 1px solid var(--primary);
-            border-radius: 4px;
-            color: var(--primary);
+            border: 1px solid var(--on-primary);
+            color: var(--link);
             flex-direction: column;
             width: min-content;
-            max-width: calc(100% - 48px); /* Allow room for collapse icon. */
+          }
+
+          nav :global(li) {
+            margin-left: 8px;
+          }
+
+          .nav-list {
+            margin-top: 50px;
           }
 
           .collapsed .nav-list {
@@ -331,13 +210,13 @@ const Layout: React.FC = ({ children }) => {
           }
 
           .collapse-menu {
-            border: none;
             background-color: var(--navbar);
-            color: var(--primary);
-            display: inline-block;
-            margin-left: 12px;
+            color: var(--link);
+            padding: 8px 16px !important;
+            position: absolute;
+            margin-left: 16px;
+            top: 0;
             line-height: 0;
-            padding: 6px;
           }
         }
       `}</style>

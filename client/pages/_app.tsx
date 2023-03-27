@@ -1,24 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import App, { AppProps } from 'next/app';
+import App, { AppContext, AppProps } from 'next/app';
+import getConfig from 'next/config';
 import Error from 'next/error';
 import Head from 'next/head';
-import { useRouter } from 'next/router';
+import { useRouter } from 'utils/router';
+import cryptoAES from 'crypto-js/aes';
+import cryptoHex from 'crypto-js/enc-hex';
+import cryptoUtf8 from 'crypto-js/enc-utf8';
 import Modal from 'react-modal';
 import nextCookies from 'next-cookies';
-import 'styles.css';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
-import useCookie from 'react-use-cookie';
+import 'styles/globals.css';
 
 import Error404 from 'pages/404';
 import Layout from 'components/layout';
 import HuntInfoContext, { EMPTY_HUNT_INFO, HuntInfo } from 'components/context';
-import { serverFetch, clientFetch } from 'utils/fetch';
+import HuntNotifications from 'components/hunt_notifications';
+import { initBuildManifestProxy } from 'utils/buildManifestProxy';
+import { serverFetch, clientFetch, addDecryptionKeys } from 'utils/fetch';
+import { dragPatch } from 'utils/dragpatch';
 import * as ga from 'utils/google_analytics';
-import SolvedNotifications from 'components/solved_notifications';
 import { createWorker } from 'utils/worker';
+import { useSessionUuid } from 'utils/uuid';
 
-// FIXME: replace font
-import headerFont from 'assets/public/Sandorian-Normal.otf';
+const {
+  publicRuntimeConfig: { ASSET_PREFIX },
+} = getConfig();
 
 type Props = AppProps & {
   huntInfo: HuntInfo;
@@ -44,18 +51,32 @@ export default function MyApp({
     } catch {
       huntInfo = EMPTY_HUNT_INFO;
     }
-
-    /** FIXME: uncomment if need to use cookies.
-    useEffect(() => {
-      const cookies = nextCookies({});
-    }, []);
-    */
   }
 
+  // Set global on client to allow decrypting.
+  // We want this to happen at the start of first render to ensure it's
+  // available before other scripts can run.
+  if (typeof window !== 'undefined') {
+    (window as unknown as any).CryptoJS = {
+      AES: cryptoAES,
+      enc: { Hex: cryptoHex, Utf8: cryptoUtf8 },
+    };
+  }
+
+  // Add decryption keys if available and remove from pageProps
+  pageProps = addDecryptionKeys(pageProps);
   // Default to 200 if no statusCode is explicitly given
-  const { statusCode = 200, puzzleData, bare = false } = pageProps;
+  const {
+    puzzleData,
+    act,
+    roundSlug,
+    theme = 'hunt',
+    statusCode = 200,
+    bare = false,
+  } = pageProps;
 
   const router = useRouter();
+  const uuid = useSessionUuid();
 
   // note huntInfo here is the { huntInfo, userInfo } object.
   const huntIsOver = new Date() > new Date(huntInfo.huntInfo.endTime);
@@ -63,6 +84,12 @@ export default function MyApp({
   useEffect(() => {
     // Set app element for accessibility reasons.
     Modal.setAppElement('body');
+    // Apply a monkeypatch to support drag events in Firefox
+    dragPatch();
+  }, []);
+
+  useEffect(() => {
+    initBuildManifestProxy();
   }, []);
 
   useEffect(() => {
@@ -72,13 +99,7 @@ export default function MyApp({
       router.events.off('routeChangeComplete', handleRouteChange);
     };
   }, [router.events]);
-
-  const isIntroSolution = !!(
-    router.pathname.startsWith('/solutions/') && puzzleData?.isIntro
-  );
-  const isWrapup =
-    router.pathname.startsWith('/wrapup') ||
-    router.pathname.startsWith('/q-and-a');
+  const basePath = router.asPath.split('#')[0]; // grab the path before hash
 
   const createdWorker = useRef(false);
   if (process.env.useWorker && !createdWorker.current) {
@@ -86,15 +107,31 @@ export default function MyApp({
     createdWorker.current = true;
   }
 
+  const huntAct = act ?? puzzleData?.round?.act ?? 1;
+  const augmentedHuntInfo: HuntInfo = {
+    ...huntInfo,
+    uuid,
+    // If on a round/puzzle page, override the theme with the round slug.
+    round: {
+      theme,
+      slug: roundSlug ?? puzzleData?.round?.slug,
+      act: huntAct,
+    },
+  };
+
   const origin = `https://${process.env.domainName}`;
 
   let content;
   if (bare) {
-    content = <Component {...pageProps} />;
+    content = (
+      <HuntInfoContext.Provider value={augmentedHuntInfo}>
+        <Component {...pageProps} />
+      </HuntInfoContext.Provider>
+    );
   } else {
     // Wrap all components in context so that hunt info is accessible anywhere.
     content = (
-      <HuntInfoContext.Provider value={huntInfo}>
+      <HuntInfoContext.Provider value={augmentedHuntInfo}>
         <Layout>
           {statusCode === 404 ? (
             <Error404 />
@@ -102,7 +139,7 @@ export default function MyApp({
             <Error statusCode={statusCode} />
           ) : (
             <>
-              <SolvedNotifications />
+              <HuntNotifications />
               <Component {...pageProps} />
             </>
           )}
@@ -114,93 +151,55 @@ export default function MyApp({
   return (
     <>
       <Head>
-        {/* FIXME: update all meta tags appropriately. */}
-        <meta property="og:title" content="FIXME Puzzlehunt" />
-        <meta property="og:site_name" content="FIXME Puzzlehunt" />
+        <meta property="og:title" content="FIXME Hunt" />
+        <meta property="og:site_name" content="FIXME Hunt" />
         <meta
           property="og:description"
-          content="An online puzzlehunt by FIXME"
+          content="The FIXME Hunt hosted by team name"
         />
         <meta
           key="og-image"
           property="og:image"
           content={
-            /* This image needs to point to an absolute url */ new URL(
-              'banner.png',
-              origin
-            ).toString()
+            /* This image needs to point to an absolute url */
+            new URL(`${ASSET_PREFIX ?? ''}/banner.png`, origin).href
           }
         />
         <meta property="og:url" content={origin} />
         <meta property="twitter:card" content="summary_large_image" />
         <meta
           property="twitter:image:alt"
-          content="An online puzzlehunt by FIXME"
+          content="The FIXME Hunt hosted by team name"
         />
 
-        <link rel="preconnect" href="https://fonts.gstatic.com" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Vollkorn:ital,wght@0,400;0,700;1,400&family=Vollkorn+SC:wght@400;700&display=swap"
-          rel="stylesheet"
-        />
-        <link rel="preload" href={headerFont} as="font" crossOrigin="" />
         <link
           key="favicon"
           rel="shortcut icon"
-          href="/favicon.ico"
+          href={`${ASSET_PREFIX ?? ''}/favicon.ico`}
           type="image/vnd.microsoft.icon"
-        />
-
-        {/* Global Site Tag (gtag.js) - Google Analytics */}
-        <script
-          async
-          src={`https://www.googletagmanager.com/gtag/js?id=${ga.GOOGLE_ANALYTICS_ID}`}
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);};
-            gtag('js', new Date());
-            gtag('config', '${ga.GOOGLE_ANALYTICS_ID}', {
-              page_path: window.location.pathname,
-            });
-            `.replace(/\s+/g, ' '),
-          }}
         />
       </Head>
 
       {content}
 
       <style global jsx>{`
-        ${!bare
-          ? ''
-          : `
-           body {
-             background-color: transparent;
-           }
-           `}
-
-        @font-face {
-          font-family: 'Sandorian';
-          src: url(${headerFont});
-          font-style: normal;
-          font-weight: 400;
-          font-display: swap;
+        body {
+          background-color: ${bare ? 'transparent' : 'inherit'};
         }
       `}</style>
     </>
   );
 }
 
-MyApp.getInitialProps = async (appContext) => {
+MyApp.getInitialProps = async (appContext: AppContext) => {
   let huntInfo: HuntInfo;
+  let domain: string = '';
 
-  const appProps = await App.getInitialProps(appContext);
+  const { pageProps, ...appProps } = await App.getInitialProps(appContext);
 
-  const { statusCode = 200 } = appProps.pageProps;
+  let { statusCode = 200 } = pageProps;
 
-  if (appProps.pageProps?.bare || statusCode >= 500) {
+  if (pageProps?.bare || statusCode >= 500) {
     // Next.js tries to staticly generate a 500 page during production build.
     // (This is a bug that was recently fixed in Next.js for 404 but not 500.)
     // TODO: Determine implications and decide whether we need to bypass
@@ -208,6 +207,7 @@ MyApp.getInitialProps = async (appContext) => {
     huntInfo = EMPTY_HUNT_INFO;
   } else if (typeof window === 'undefined') {
     if (process.env.isStatic) {
+      // TODO: figure out what to do with the domain in the static case
       try {
         huntInfo = require('assets/json_responses/hunt_info.json');
       } catch {
@@ -232,5 +232,10 @@ MyApp.getInitialProps = async (appContext) => {
   // Pass the cookies to the app.
   const cookies = nextCookies(appContext.ctx);
 
-  return { cookies, huntInfo, ...appProps };
+  return {
+    cookies,
+    huntInfo,
+    pageProps,
+    ...appProps,
+  };
 };

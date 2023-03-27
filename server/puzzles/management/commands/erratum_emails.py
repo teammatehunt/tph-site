@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from puzzles.models import PuzzleUnlock, Team, TeamMember
+from puzzles.models import PuzzleAccess, Team
 
 
 class Command(BaseCommand):
@@ -11,12 +11,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         slug = options["puzzle_slug"][0]
         self.stdout.write("Getting email addresses for puzzle {}...\n\n".format(slug))
-        teams = PuzzleUnlock.objects.filter(puzzle__slug=slug).values_list(
+        teams = PuzzleAccess.objects.filter(puzzle__puzzle__slug=slug).values_list(
             "team", flat=True
         )
+        members = []
         for team in teams:
-            for member in TeamMember.objects.filter(team=team):
-                members.append(member.email)
+            members.extend(team.all_emails)
         if len(members) > 0:
             self.stdout.write(", ".join(members))
             self.stdout.write(

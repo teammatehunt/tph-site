@@ -1,0 +1,61 @@
+{# Preconditions: interaction is ready, there is a handler. #}
+
+<h3>Story actions</h3>
+
+{% if interaction_access.interactionaccesstask.replied and not allow_danger %}
+<p><em>You've already let the team know about the story. Resolve the interaction when the puzzle should be released.</em></p>
+{% else %}
+    {% if interaction_access.interactionaccesstask.replied %}
+    <p><em style="color: red">You've already let the team know about the story. You're using danger mode to reply again.</em></p>
+    {% endif %}
+    <p>Choose whether to let them know about the story <strong>live</strong> or <strong>via email</strong>. When you've decided, pick a template and send them the email.</p>
+
+    {% if not body %}
+    {% for canned in email_templates %}
+        <button type="button" class="{{ canned.slug }}">{{ canned.description }}</button>
+    {% endfor %}
+    {% endif %}
+
+    {% if error %}
+    <div class="banner error">
+        <span><strong>Error</strong>: {{ error }}</span>
+    </div>
+    {% endif %}
+
+    {# NB: These two forms are identical except for the class name and default textarea template. #}
+    <form method="post" class="email-form{% if not body %} hidden{% endif %}">
+        {% csrf_token %}
+        <fieldset>
+            <p>Emailing <a href="mailto:{{ team.team_email }}" target="_blank">{{ team.team_email }}</a><p>
+
+            <div class="form-row">
+                <label for="id_subject">Subject</label>
+                <input type="text" name="subject" id="id_subject" required value="{{ subject }}" maxlength="500">
+            </div>
+
+            <div class="form-row">
+                <label for="id_body">HTML Body</label>
+                <textarea name="body" placeholder="Enter your html message here" required>{{ body }}</textarea>
+            </div>
+
+            <div class="form-row">
+                <label for="id_text_content">Plaintext Body</label>
+                <textarea name="text_content" placeholder="Enter your plaintext message here" required>{{ body }}</textarea>
+            </div>
+
+            <div>
+                <p>This will send a real email to a real team - be careful!</p>
+                <label for="id_confirm_email_send">Enter "SEND" to confirm</label>
+                <input type="text" name="confirm" id="id_confirm_email_send" required>
+            </div>
+
+            {% if allow_danger %}
+            <input type="hidden" name="danger-resend" value="1">
+            {% endif %}
+
+            <input type="submit" value="Send">
+        </fieldset>
+    </form>
+
+    {% include 'spoilr/email/partials/canned-emails.tmpl' with email_templates=email_templates %}
+{% endif %}

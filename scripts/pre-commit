@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -e
+REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
+cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
+
+# This script gets symlinked to the pre-commit, pre-merge-commit, and pre-push git hooks.
+# Additionally, this can be run directly, or with --all-files
+
+pre-commit-cmd() {
+  command docker run --rm -i -v "$(pwd)/.pre-commit/cache:/pre-commit-cache" -v "$(pwd):/host" -w /host -u "$(id -u):$(id -g)" -e HOME=/pre-commit-cache/home pre-commit-mh-2023 pre-commit "$@"
+}
+
+HOOK="$(basename "$0")"
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+mkdir -p "$(pwd)/.pre-commit/cache/home"
+(cd .pre-commit && (output="$(docker build -t pre-commit-mh-2023 - <pre-commit.Dockerfile)" || (echo "$output" && exit 1)))
+if [ "$(basename "$HOOK_DIR")" = "hooks" ] ; then
+  pre-commit-cmd hook-impl --color always --hook-type "$HOOK" --hook-dir "$HOOK_DIR" -- "$@"
+else
+  pre-commit-cmd run --color always "$@"
+fi

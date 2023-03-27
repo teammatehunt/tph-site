@@ -1,6 +1,7 @@
 // Used to create grids, such as crosswords. Can also be used as blanks to fill in.
 
 import React, { CSSProperties } from 'react';
+import cx from 'classnames';
 
 import { HIDDEN_CLASS, NO_COPY_CLASS } from 'components/copy';
 import { Colors } from 'components/crossword';
@@ -12,18 +13,22 @@ export const _ = '';
 interface Props {
   data: Cell[][];
   lightBorder?: boolean;
+  dashed?: boolean;
   shading?: (Colors | '')[][];
   noBorder?: boolean[][];
+  className?: string;
 }
 
 const Grid: React.FunctionComponent<Props> = ({
   data,
   lightBorder = false,
+  dashed = false,
   shading = null,
   noBorder = null,
+  className,
 }) => (
   <>
-    <div className={NO_COPY_CLASS}>
+    <div className={cx(NO_COPY_CLASS, className, { dashed })}>
       <table cellSpacing={0} className={lightBorder ? 'light' : ''}>
         <tbody>
           {data.map((row, i) => (
@@ -93,6 +98,10 @@ const Grid: React.FunctionComponent<Props> = ({
         height: 30px;
         width: 30px;
         position: relative;
+      }
+
+      .${NO_COPY_CLASS}.dashed td {
+        border-style: dashed;
       }
 
       .${NO_COPY_CLASS} .light td {

@@ -3,184 +3,227 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import dynamic from 'next/dynamic';
 
+import AutoResizer from 'components/autoresizer';
 import Custom404 from 'pages/404';
-import Section from 'components/section';
-import PuzzleImage, { PuzzleData } from 'components/puzzle_image';
 import HuntInfoContext from 'components/context';
-import { serverFetch } from 'utils/fetch';
-//import map from 'assets/public/map.jpg';
 import PostHuntSettings from 'components/post_hunt_settings';
+import PuzzleImage, { PuzzleData } from 'components/puzzle_image';
+import { RoundData as PuzzleRoundData } from 'components/puzzle';
+import Section from 'components/section';
+import { serverFetch } from 'utils/fetch';
 
-const StoryNotifications = dynamic(
-  () => import('components/story_notifications'),
-  { ssr: false }
-);
+const DragDropPiece = dynamic(() => import('components/drag_drop_ui'), {
+  ssr: false,
+});
+
+export const updateArray = (index, setState) => (newVal) => {
+  setState((vals) => vals.map((item, i) => (i !== index ? item : newVal)));
+};
+
+const DEFAULT_WIDTH = 1000;
+const DEFAULT_HEIGHT = 640;
+
+export interface RoundData extends PuzzleRoundData {
+  wordmark: string;
+  roundart?: string; // background behind puzzle icons
+  footer?: string;
+  foreground?: string;
+  position?: { x: number; y: number; width?: number };
+  textOverlay?: boolean;
+}
+
+export interface RoundProps {
+  // Map from round name to list of puzzles.
+  puzzles: Record<string, PuzzleData[]>;
+  rounds: Record<string, RoundData>;
+}
 
 export interface Props {
   // Map from round name to list of puzzles.
   puzzles: Record<string, PuzzleData[]>;
+  roundData: RoundData;
 }
 
-const Logo: FunctionComponent<{
-  position?: [number, number];
-  width?: number | string;
+const Wordmark: FunctionComponent<{
+  imageUrl: string;
   zIndex?: number;
-}> = ({ position = undefined, width = undefined, zIndex = undefined }) => (
-  <div
-    style={
-      position
-        ? {
-            left: position[0],
-            top: position[1],
-            width: width,
-            zIndex: zIndex ?? 0,
-          }
-        : {}
-    }
-  >
-    <img src="/logo.png" />
-    <style jsx>{`
-      div {
-        display: inline-block;
-        text-align: center;
-        position: absolute;
-        transform: translate(-50%, -50%);
-      }
-
-      img {
-        width: ${width}px;
-      }
-    `}</style>
+}> = ({ imageUrl, zIndex = undefined }) => (
+  <div className="wordmark absolute top-[12%] flex justify-center w-full pt-2">
+    <img className="mark max-w-[40%]" src={imageUrl} />
   </div>
+);
+
+export const RoundHeader: FunctionComponent<{
+  roundData: RoundData;
+}> = ({ roundData }) => (
+  <header key={roundData.slug} className="relative -mt-8">
+    {roundData.header && (
+      <img className="w-full -z-10" src={roundData.header} alt="" />
+    )}
+    {roundData.wordmark && <Wordmark imageUrl={roundData.wordmark} />}
+  </header>
+);
+
+export const RoundFooter: FunctionComponent<{
+  roundData: RoundData;
+}> = ({ roundData }) => (
+  <img
+    className="absolute inset-x-0 bottom-0 w-full -z-10"
+    src={roundData.footer}
+  />
 );
 
 export const PuzzleImages: FunctionComponent<{
   puzzles: PuzzleData[];
+  roundData: RoundData;
   showSolved?: boolean;
-}> = ({ puzzles, showSolved }) => {
-  const { userInfo } = useContext(HuntInfoContext);
+}> = ({ puzzles, roundData, showSolved }) => {
+  const { huntInfo, userInfo } = useContext(HuntInfoContext);
+  const showDragDrop = userInfo?.superuser && huntInfo.secondsToStartTime > 0;
 
-  const w = 950;
-  const h = 820;
-  const [width, setWidth] = useState(w);
-  const ref = useRef<HTMLDivElement>(null);
-  const scale = width / w;
+  const positions = useMemo(
+    () =>
+      puzzles.map((puzzle) => {
+        return puzzle.mainRoundPosition ?? puzzle.position ?? [0, 0];
+      }),
+    [puzzles]
+  );
+  const widths = useMemo(
+    () => puzzles.map((puzzle) => puzzle.iconSize),
+    [puzzles]
+  );
+  const [posStates, setPosStates] = useState(positions);
+  const [widthStates, setWidthStates] = useState(widths);
 
   useEffect(() => {
-    const onResize = () => {
-      if (ref.current) {
-        setWidth(ref.current.offsetWidth);
-      }
-    };
-    onResize();
-    window.addEventListener('resize', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-    };
-  }, []);
+    setPosStates(positions);
+    setWidthStates(widths);
+  }, [positions, widths]);
 
-  // FIXME
   return (
     <>
-      <div className="container" ref={ref}>
-        {/* FIXME: the canvas will resize based on the dimensions fo the background image */}
-        {/*<img className="bg" src={map} />*/}
+      <AutoResizer className="select-none">
+        {(width, height, ref) => (
+          <>
+            {roundData.roundart && (
+              <img
+                key={roundData.slug}
+                alt=""
+                className="w-full"
+                src={roundData.roundart}
+              />
+            )}
+            {puzzles.map((puzzle, i) => (
+              <PuzzleImage
+                key={puzzle.slug}
+                puzzleData={puzzle}
+                showSolved={showSolved}
+                imageWidth={widthStates[i]}
+                position={posStates[i]}
+                textPosition={puzzle.textPosition}
+                textOverlay={roundData.textOverlay}
+              />
+            ))}
+            {showDragDrop &&
+              puzzles.map((puzzle, i) => (
+                <DragDropPiece
+                  key={puzzle.slug}
+                  slug={puzzle.slug}
+                  position={posStates[i]}
+                  setPosition={updateArray(i, setPosStates)}
+                  imageWidth={widthStates[i]}
+                  setWidth={updateArray(i, setWidthStates)}
+                  roundWidth={width}
+                  roundHeight={height}
+                  containerRef={ref}
+                />
+              ))}
+          </>
+        )}
+      </AutoResizer>
+      {roundData.footer && <RoundFooter roundData={roundData} />}
+    </>
+  );
+};
 
-        <div className="canvas">
-          {puzzles.map((puzzle) => (
-            <PuzzleImage
-              key={puzzle.slug}
-              puzzleData={puzzle}
+const PuzzlesMap = ({ puzzles, roundData }: Props) => {
+  const [showSolved, setShowSolved] = useState<boolean>(false);
+  const allPuzzles = Object.values(puzzles ?? {}).flat();
+
+  return (
+    <>
+      {allPuzzles.length ? (
+        <>
+          <RoundHeader roundData={roundData} />
+          <Section className="puzzles-map pt-0 min-h-[50vh]">
+            <PostHuntSettings
               showSolved={showSolved}
-              imageHeight={puzzle.iconSize}
-              position={[puzzle.position[0] ?? 0, puzzle.position[1] ?? 0]}
-              mainRoundPosition={puzzle.mainRoundPosition}
+              setShowSolved={setShowSolved}
             />
-          ))}
-          <Logo position={[180, 111]} width={250} />
-        </div>
-      </div>
+            <PuzzleImages
+              roundData={roundData}
+              puzzles={allPuzzles}
+              showSolved={showSolved}
+            />
+          </Section>
+        </>
+      ) : (
+        <Custom404 />
+      )}
 
-      <style jsx>{`
-        .bg {
-          user-select: none;
-          width: ${w}px;
-          max-width: 100%;
-        }
-
-        .container {
-          position: relative;
-          max-width: 100%;
-          width: max-content;
-          height: min-content;
-          margin-left: auto;
-          margin-right: auto;
-        }
-
-        .canvas {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: ${w}px;
-          height: ${h}px;
-          user-select: none;
-          transform: scale(${scale});
-          transform-origin: top left;
+      <style global jsx>{`
+        /* Override the background style. */
+        #__next {
+          background-image: ${roundData.background
+            ? `url(${roundData.background}) !important`
+            : `inherit`};
         }
       `}</style>
     </>
   );
 };
 
-const PuzzlesMap = ({ puzzles }: Props) => {
-  const { userInfo, huntInfo } = useContext(HuntInfoContext);
-  const toggle = huntInfo.toggle;
-  const [showSolved, setShowSolved] = useState<boolean>(false);
-  const allPuzzles = Object.values(puzzles ?? {}).flat();
-
-  return (
-    <div>
-      <StoryNotifications />
-
-      <Section className="nopadding">
-        <PostHuntSettings
-          showSolved={showSolved}
-          setShowSolved={setShowSolved}
-        />
-        {allPuzzles.length ? (
-          <PuzzleImages puzzles={allPuzzles} showSolved={showSolved} />
-        ) : (
-          <Custom404 />
-        )}
-      </Section>
-
-      <style global jsx>{`
-        section.nopadding {
-          padding-top: 0;
-        }
-      `}</style>
-    </div>
-  );
-};
+interface RoundServerResponse extends RoundProps {
+  redirect?: string;
+}
 
 export default PuzzlesMap;
-export const getPuzzlesMapProps = async (context) => {
-  let props: Props;
-  if (process.env.isStatic) {
-    try {
-      props = require('assets/json_responses/puzzles.json');
-    } catch {
-      props = {} as Props;
+export const getPuzzlesMapProps =
+  (slug?: string, redirect = false) =>
+  async (context) => {
+    let props: RoundServerResponse;
+    if (process.env.isStatic) {
+      try {
+        props = require('assets/json_responses/puzzles.json');
+      } catch {
+        props = {} as RoundServerResponse;
+      }
+    } else {
+      const url = slug ? `/rounds/${slug}` : '/puzzles';
+      props = await serverFetch<RoundServerResponse>(context, url);
     }
-  } else {
-    props = await serverFetch<Props>(context, '/puzzles');
-  }
-  return {
-    props,
+
+    if (props.redirect) {
+      return {
+        redirect: {
+          destination: props.redirect,
+          permanent: false,
+        },
+      };
+    }
+
+    const act = (slug && props.rounds?.[slug]?.act) || 1;
+    const newProps = {
+      ...props,
+      roundSlug: slug,
+    };
+    if (act) {
+      newProps[act] = act;
+    }
+
+    return { props: newProps };
   };
-};

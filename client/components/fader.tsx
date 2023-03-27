@@ -1,8 +1,10 @@
 import React, { FunctionComponent } from 'react';
-import { CSSTransitionGroup } from 'react-transition-group';
+import cx from 'classnames';
+import { Transition } from '@headlessui/react';
 
 interface Props {
   name: string;
+  show: boolean;
   fadeInTime?: number;
   fadeOutTime?: number;
 }
@@ -10,36 +12,32 @@ interface Props {
 /** Used to fade in and out when a child component is first rendered or removed. */
 const Fader: FunctionComponent<Props> = ({
   name,
-  fadeInTime = 400,
-  fadeOutTime = 400,
+  show,
+  fadeInTime = 300,
+  fadeOutTime = 300,
   children,
 }) => (
-  <CSSTransitionGroup
-    transitionName={name}
-    transitionEnterTimeout={fadeInTime}
-    transitionLeaveTimeout={fadeOutTime}
+  <Transition
+    appear
+    show={show}
+    enter={cx(name, 'transition-opacity ease-in fade-in')}
+    enterFrom="opacity-0"
+    enterTo="opacity-100"
+    leave={cx(name, 'transition-opacity ease-in fade-out')}
+    leaveFrom="opacity-100"
+    leaveTo="opacity-0"
   >
     {children}
-    <style jsx>{`
-      :global(.${name}-enter) {
-        opacity: 0.01;
+    <style global jsx>{`
+      .${name}.fade-in {
+        transition-duration: ${fadeInTime}ms;
       }
 
-      :global(.${name}-enter.${name}-enter-active) {
-        opacity: 1;
-        transition: opacity ${fadeInTime}ms ease-in;
-      }
-
-      :global(.${name}-leave) {
-        opacity: 1;
-      }
-
-      :global(.${name}-leave.${name}-leave-active) {
-        opacity: 0.01;
-        transition: opacity ${fadeOutTime}ms ease-in;
+      .${name}.fade-out {
+        transition-duration: ${fadeOutTime}ms;
       }
     `}</style>
-  </CSSTransitionGroup>
+  </Transition>
 );
 
 export default Fader;

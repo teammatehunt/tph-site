@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { useRouter } from 'next/router';
+import Link from 'components/link';
+import { useRouter } from 'utils/router';
 import { useState } from 'react';
 
 import Section from 'components/section';
@@ -75,7 +75,10 @@ const ResetPassword = ({ valid }: Props) => {
 
   return (
     <Section center heading="Reset team password">
-      <form onSubmit={onSubmit}>
+      <form
+        className="flex flex-col items-center justify-center mx-auto my-0"
+        onSubmit={onSubmit}
+      >
         <input
           hidden
           readOnly
@@ -119,11 +122,6 @@ const ResetPassword = ({ valid }: Props) => {
 
       <style jsx>{`
         form {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          margin: 0 auto;
           max-width: 500px;
         }
 

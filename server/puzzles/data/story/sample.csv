@@ -1,0 +1,8 @@
+State,Dialogue,Next State,Option 1,Option 2,Option 3,Option 4
+start,"Hello. This is some sample dialogue. This is in <b>bold</b>, <u>underline</u>, and <i>italics</i>.",,,,,
+,This dialogue will occur automatically after the user continues from the previous line.,,,,,
+,"Now for some text options, please select one of the following.",,[[Hello!|hello]],[[What's up?|hello]],[[Let's skip to the end|end]],
+hello,Hello to you too! Do you like apples?,,[[Yes I do|yes-apples]],[[I hate them|no-apples]],,
+yes-apples,Me too!,end,,,,
+no-apples,Aww you are a fruit hater.,end,,,,
+end,That's the end of this dialogue example,EXIT,,,,

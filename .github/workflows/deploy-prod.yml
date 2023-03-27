@@ -1,0 +1,32 @@
+name: deploy-prod
+
+on:
+  workflow_dispatch:
+
+concurrency: deploy-prod
+
+jobs:
+  deploy-prod:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      # only allow if the main branch or the tag latest
+      assert_branch: main
+      assert_tag: latest
+      DEPLOY_USER: prod
+      DEPLOY_HOST: prod.mypuzzlehunt.com
+      SERVER_ENVIRONMENT: prod
+      BUILD_SITE: hunt-reg
+      POSTGRES_CONF: deploy/postgresql.prod.conf
+      HUNT_HOST: mypuzzlehunt.com
+      REGISTRATION_HOST: registration.mypuzzlehunt.com
+      # scale to number of cores
+      UVICORN_NUM_PROCS: 1
+      CELERY_NUM_PROCS: 1
+      COPY_DRIVE_CREDS: 1
+      EXTRA_ENV: |-
+        DB_SHM_SIZE=1gb
+        GOOGLE_ANALYTICS_ID=FIXME
+        CDN_HUNT_HOST=cdn.mypuzzlehunt.com
+        CDN_REGISTRATION_HOST=cdn.registration.mypuzzlehunt.com
+        WWW_REDIRECT=www.registration.mypuzzlehunt.com, www.mypuzzlehunt.com, www.mypuzzlehunt2.com
+    secrets: inherit

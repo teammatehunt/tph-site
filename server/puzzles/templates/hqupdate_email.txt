@@ -1,0 +1,9 @@
+{% autoescape off %}
+{% if update.puzzle %}
+An erratum was issued for the puzzle {{ update.puzzle.name }}.
+
+Erratum: {{ update.body }}
+{% else %}
+{{ update.body}}
+{% endif %}
+{% endautoescape %}

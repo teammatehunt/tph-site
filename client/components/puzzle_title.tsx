@@ -1,4 +1,5 @@
-import React, { FC, useMemo } from 'react';
+import React, { FC, ReactNode, useMemo } from 'react';
+import cx from 'classnames';
 
 const SPLIT_LENGTH = 20;
 
@@ -30,7 +31,7 @@ const computeSplit = (title: string): [string, string | undefined] => {
 };
 
 interface Props {
-  title: string;
+  title: ReactNode;
   small?: boolean;
   bannerImg?: string;
   bannerAlt?: string;
@@ -39,18 +40,24 @@ interface Props {
 const PuzzleTitle: FC<Props> = ({ title, small, bannerImg, bannerAlt }) => {
   return (
     <>
-      <div className={`puzzle-title ${small ? 'small' : ''}`}>{title}</div>
+      <h1 className={cx('font-title text-center w-full', { small })}>
+        {title}
+      </h1>
 
       {bannerImg && <img className="banner" src={bannerImg} alt={bannerAlt} />}
 
       <style jsx>{`
-        div.puzzle-title {
+        h1 {
           max-width: 700px;
-          width: 100%;
-          text-align: center;
-          font-family: var(--title-font);
-          font-size: ${small ? '56' : '70'}px;
-          color: var(--primary);
+          color: var(--white);
+          text-shadow: 0px 0px 12px black;
+          margin: 1rem 0 2rem;
+          filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.25));
+        }
+
+        h1.small {
+          font-size: min(80px, 6vh) !important;
+          margin-bottom: 1rem;
         }
 
         .banner {
@@ -66,6 +73,16 @@ const PuzzleTitle: FC<Props> = ({ title, small, bannerImg, bannerAlt }) => {
         @media (max-width: 600px) {
           .banner {
             margin-top: -40px;
+          }
+        }
+
+        @media print {
+          h1 {
+            color: black;
+            font-size: 40px !important;
+            text-shadow: none;
+            filter: none !important;
+            margin: 0;
           }
         }
       `}</style>

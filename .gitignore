@@ -1,0 +1,74 @@
+/.git
+
+# pre-commit docker cache
+/.pre-commit/cache
+
+# Next.js directories
+/client/.next
+/client/node_modules
+/reg-client/.next
+/reg-client/node_modules
+/posthunt-client/.next
+/posthunt-client/node_modules
+
+# build directory
+/dist/
+/client/schema/
+
+# creds
+/gdrive-creds.json
+/gdrive-uploader-creds.json
+
+# dev .env file
+/.env
+
+# pyc files and cache
+*.pyc
+__pycache__/
+
+# Auto-collected static files folder
+/server/static/
+
+# Virtualenv
+venv/
+env/
+.venv/
+
+# pyenv
+.python-version
+
+# pid files
+*.pid
+
+# MacOS generated files
+.DS_Store
+
+*.swo
+*.tmp
+*.swp
+*.bak
+.vscode/
+
+# temp files added by Babun
+*~
+
+# Vagrant files
+.vagrant/
+Vagrantfile
+setup_vagrant_vm.sh
+
+# Vim files
+.lvimrc
+
+.ignore
+
+.mypy_cache/
+
+# local dev testing email
+/dev_email_whitelist.txt
+
+# build info
+tsconfig.tsbuildinfo
+
+# xk6-browser tool for load testing, recommended to run via current working dir.
+xk6-browser*

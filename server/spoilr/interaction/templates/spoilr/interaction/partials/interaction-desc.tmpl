@@ -1,0 +1,15 @@
+<div class="interaction-desc">
+{% if interaction.interaction_type == 'submission' %}
+  This is a <strong>submission puzzle</strong> - teams will email us their submissions and we need to grade them.
+{% elif interaction.interaction_type == 'story' %}
+  This is a <strong>story interaction</strong> - we need to contact the team to arrange a live interaction, or send them an email with the story.
+{% elif interaction.interaction_type == 'physical' %}
+  This is a <strong>physical interaction</strong> - we need to contact the team to arrange for a physical puzzle pickup, or let them know where to find a staffed room puzzle.
+{% elif interaction.interaction_type == 'unlock' %}
+  This is a <strong>time unlock interaction</strong> - a team is eligible for a time unlock and we need to construct a URL to send to the team captain which will allow them to opt-in. (We may generate this automatically, TBD.)
+{% elif interaction.interaction_type == 'answer' %}
+  This is an <strong>answer interaction</strong> - we need to confirm a team's request to use a free answer with the team captain. (Also TBD if we want redemption to work this way.)
+{% else %}
+  <em>Unknown interaction type.</em>
+{% endif %}
+</div>

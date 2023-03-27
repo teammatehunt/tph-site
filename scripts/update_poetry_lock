@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -e
+REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
+cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
+
+if docker inspect tph &>/dev/null
+then
+  docker run --rm -it -v "$(pwd)/server/poetry:/host" -u "$(id -u):$(id -g)" -e POETRY_VIRTUALENVS_PATH=/tmp/virtualenvs -w /host tph poetry lock --no-update --no-cache
+else
+  >&2 echo 'Error: First run `./initialize_dev` to build the image (may need to revert the poetry config first)'
+  exit 1
+fi

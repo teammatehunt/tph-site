@@ -1,0 +1,12 @@
+name: refresh-assets-staging
+
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh-assets-staging:
+    uses: ./.github/workflows/refresh-assets.yml
+    with:
+      DEPLOY_USER: staging
+      DEPLOY_HOST: staging.teammatehunt.com
+    secrets: inherit

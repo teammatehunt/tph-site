@@ -25,10 +25,10 @@
 
 <ul>
     {% for team, team_emails in emails %}
-        <li>Team: {{ team.team_name }}</li>
+        <li>Team: {{ team.name }}</li>
         <ul>
         {% for email in team_emails %}
-            <li>{{ email }} (Team: {{ team.team_name }})</li>
+            <li>{{ email }} (Team: {{ team.name }})</li>
         {% endfor %}
         </ul>
     {% endfor %}

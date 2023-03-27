@@ -3,17 +3,21 @@ import platform
 
 from tph.constants import IS_PYODIDE
 
-
 if IS_PYODIDE:
     import pydoc
 
     class FakeCelery:
         @staticmethod
         def send_task(*args, **kwargs):
+            # ignore because send_task is currently only used for sending emails
             pass
 
         @staticmethod
         def task(func):
+            # .delay and .apply_async are currently only used for sending
+            # emails and discord messages, so make this a noop
+            func.delay = lambda *args, **kwargs: None
+            func.apply_async = lambda *args, **kwargs: None
             return func
 
     celery_app = FakeCelery()
@@ -39,7 +43,10 @@ else:
 
     @signals.after_setup_task_logger.connect
     def setup_task_logger(logger, *args, **kwargs):
-        logger.setLevel("DEBUG")
+        if server_environment in ("dev", "staging"):
+            logger.setLevel("DEBUG")
+        else:
+            logger.setLevel("INFO")
 
     # Load task modules from all registered Django celery_app configs.
     celery_app.autodiscover_tasks()
@@ -48,3 +55,9 @@ else:
     def debug_task(self):
         print(f"Request: {self.request!r}")
         return "Task finished!"
+
+    @celery_app.task(name="spoilr-tick")
+    def tick():
+        from spoilr.core.views.hunt_views import do_tick
+
+        do_tick()

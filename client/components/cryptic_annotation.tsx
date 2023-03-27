@@ -1,6 +1,8 @@
 import React, { Fragment, FunctionComponent, ReactFragment } from 'react';
+import cx from 'classnames';
 
 export type ClueFragment =
+  | [ReactFragment]
   | [ReactFragment, string]
   | [ReactFragment, string, boolean];
 
@@ -28,13 +30,14 @@ const CrypticAnnotation: FunctionComponent<Props> = ({
   showLength = true,
 }) => (
   <>
-    {clue.map(([fragment, explanation, isDef = false], i) => {
+    {clue.map(([fragment, explanation = '', isDef = false], i) => {
       const description = [isDef ? 'Definition' : '', explanation]
         .filter((s) => !!s)
         .join(': ');
       return (
         <Fragment key={`${answer}-${i}`}>
           <span
+            className={cx({ underline: isDef })}
             tabIndex={0}
             data-tip={description || null}
             data-for={tooltipId}
@@ -43,13 +46,10 @@ const CrypticAnnotation: FunctionComponent<Props> = ({
             {fragment}
           </span>{' '}
           <style jsx>{`
-            span {
-              text-decoration: ${isDef ? 'underline' : 'none'};
-            }
-
             span:focus,
             span:hover {
-              font-weight: bold;
+              color: var(--primary);
+              cursor: help;
             }
           `}</style>
         </Fragment>

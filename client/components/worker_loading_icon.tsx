@@ -10,7 +10,7 @@ const WorkerLoadingIcon: React.FC<{ needsShared?: boolean }> = ({
   const { ready, error } = useWorker();
   if (error || (needsShared && !SUPPORTS_SHARED_WORKER)) {
     return (
-      <InfoIcon warning>
+      <InfoIcon warning center color="orangered">
         Some interactive components are not supported by your browser. Please
         use a recent version of Firefox without private browsing or desktop
         Chrome.
@@ -19,7 +19,7 @@ const WorkerLoadingIcon: React.FC<{ needsShared?: boolean }> = ({
   }
   if (ready) return null;
   return (
-    <InfoIcon>
+    <InfoIcon center color="darkorange">
       {children ? children : 'Loading interactive components...'}
     </InfoIcon>
   );

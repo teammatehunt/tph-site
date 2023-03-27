@@ -19,19 +19,25 @@ fi
 echo "Is this a meta? [y/N]:"
 read is_meta
 if [[ $is_meta == "y" ]]; then
-  meta_arg=" --is-meta"
+  meta_arg="--is-meta"
 else
   meta_arg=""
 fi
 
 echo "Enter puzzle answer (defaults to 'REDACTED'):"
 read answer
-if [ -z "$round" ]; then
+if [ -z "$answer" ]; then
   answer="REDACTED"
 fi
 
 # Create puzzle in Django and get the slug (trimming whitespace)
-slug=$(docker-compose exec tph /app/server/manage.py create_new_puzzle "$title" --round "$round" --answer "$answer""$meta_arg" | tr -d $"\r")
+cmd=$(docker-compose exec tph /app/server/manage.py create_new_puzzle "$title" --round "$round" --answer "$answer" $meta_arg)
+if [ $? -ne 0 ]; then
+    echo "Creation failed!"
+    exit 1
+fi
+
+slug=$(tr -d $"\r" <<< "$cmd")
 
 echo "Successfully created puzzle $title ($slug) [$round] in Django."
 echo -e "If you need to make further edits, please see the Django admin page.\n"
@@ -42,10 +48,10 @@ INSERT_TITLE=$title
 INSERT_ANSWER=$answer
 sed_string="s/\[\[INSERT SLUG\]\]/${INSERT_SLUG}/g; s/\[\[INSERT TITLE\]\]/${INSERT_TITLE}/g; s/\[\[INSERT ANSWER\]\]/${INSERT_ANSWER}/g;"
 mkdir -p client/pages/puzzles/
-sed "${sed_string}" < client/templates/puzzle.template.tsx > client/pages/puzzles/$slug.tsx
+sed "${sed_string}" < "client/templates/puzzle.template.tsx" > "client/pages/puzzles/$slug.tsx"
 echo "Successfully created frontend page: client/pages/puzzles/$slug.tsx"
 mkdir -p client/pages/solutions/
-sed "${sed_string}" < client/templates/solution.template.tsx > client/pages/solutions/$slug.tsx
+sed "${sed_string}" < "client/templates/solution.template.tsx" > "client/pages/solutions/$slug.tsx"
 echo -e "Successfully created frontend page: client/pages/solutions/$slug.tsx\n"
 
 echo "When everything looks good, make sure to run ./scripts/save_fixtures to update the fixtures."

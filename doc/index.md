@@ -5,8 +5,6 @@ not a comprehensive resource, but aims to describe things well enough to get you
 started on how to modify the code to do what you want. See Next.js, Django, and Caddy
 documentation for further pointers.
 
-[[_TOC_]]
-
 ## Site Overview
 
 The teammate repo is based on a fork of [gph-site](https://github.com/galacticpuzzlehunt/gph-site),
@@ -84,7 +82,7 @@ webhooks, and sending a POST request to the generated URL lets any user post a m
 
 This is good for basic alerts, but its chief limitation is that you can only send text content, and cannot
 edit previously made messages. More complex behaviors requiring running the Discord bot,
-whose code is at `server/discord_bot.py`. Despite living in `server/`, it's not run by Django, the
+whose code is at `server/scripts/discord_bot.py`. Despite living in `server/`, it's not run by Django, the
 deploy starts it separately. Currently we use the bot to manage hints and email. New hints trigger an
 alert, and the hint response is edited in-line to that alert.
 
@@ -97,7 +95,7 @@ it's been okay so far...
 
 By default, only one instance of the bot should ever be running, because parts of the bot are not
 idempotent. The deploy script is setup to only run it in prod, not staging or dev. However, you're
-welcome to run the bot in dev when implementing new features. Just run `python discord_bot.py` in
+welcome to run the bot in dev when implementing new features. Just run `servir/scripts/discord_bot.py` in
 a separate terminal (requires installing [discord.py](https://discordpy.readthedocs.io/en/stable/) first.
 
 Known issues:
@@ -162,4 +160,5 @@ which enables us to install and run Python in the browser. This essentially lets
 run server code with minimal changes in the browser! In place of Postgres, IndexedDB
 is used as a client-side database.
 
-Read more about how to set this up and deploy in posthunt/README.md.
+Read more about how to set this up and deploy in
+[posthunt/README.md](/posthunt/README.md).

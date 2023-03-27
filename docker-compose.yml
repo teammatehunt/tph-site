@@ -1,18 +1,45 @@
-version: '3.7'
+version: "3.7"
 
 services:
   db:
     image: postgres:13.2
     restart: unless-stopped
-    volumes:
-      - pgdata:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=makeSUREtoREPLACEthis
+    volumes:
+      # allow database replication with authentication
+      - ./scripts/pg_replica/pg_hba_init.sh:/docker-entrypoint-initdb.d/pg_hba_init.sh:ro
+    # ensure pg_hba.conf is set
+    command: /docker-entrypoint-initdb.d/pg_hba_init.sh /docker-entrypoint.sh postgres
+    shm_size: ${DB_SHM_SIZE:-64mb}
+    ulimits:
+      nofile:
+        soft: 20000
+        hard: 40000
+  pgbouncer:
+    image: edoburu/pgbouncer:1.18.0
+    restart: unless-stopped
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=makeSUREtoREPLACEthis
+      - DB_NAME=postgres
+      - MAX_CLIENT_CONN=2000
+      - DEFAULT_POOL_SIZE=2000
+      - CLIENT_IDLE_TIMEOUT=3600
+    ulimits:
+      nofile:
+        soft: 20000
+        hard: 40000
+    depends_on:
+      - db
   redis:
     image: redis:6.2.1
     restart: unless-stopped
+    deploy:
+      replicas: ${REDIS_REPLICAS:-1}
   tph:
     # This is a dummy image name to allow `docker-compose` commands without
     # specifying multiple compose files when the containers are already up.
@@ -20,15 +47,14 @@ services:
     image: tph
     environment:
       - SECRET_KEY=makeSUREtoREPLACEthis
-      - SMTP_PASSWORD=FIXME
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=pgbouncer
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=makeSUREtoREPLACEthis
       - REDIS_HOST=redis
+      - ENABLE_BACKEND=true
+      - SERVE_FIXTURES=false
     depends_on:
       - db
+      - pgbouncer
       - redis
-
-volumes:
-  pgdata:

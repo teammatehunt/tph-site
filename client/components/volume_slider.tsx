@@ -1,7 +1,7 @@
 import React, { FunctionComponent, useEffect, useState } from 'react';
 import Slider from 'react-rangeslider';
 import { Howler } from 'howler';
-import { Volume, Volume1, Volume2, VolumeX } from 'react-feather';
+import { VolumeOffIcon, VolumeUpIcon } from '@heroicons/react/solid';
 
 import { TICK_SOUND_EFFECTS } from 'utils/timer';
 import { useLocalStorage } from 'utils/storage';
@@ -17,8 +17,6 @@ const VolumeSlider: FunctionComponent<{}> = () => {
   );
   const [lastVolume, setLastVolume] = useState<number>(volume);
 
-  const { isLoading, sounds } = useSounds('', [TICK_SOUND_EFFECTS]);
-
   const toggleMute = () => {
     let value;
     if (volume === 0) {
@@ -28,19 +26,12 @@ const VolumeSlider: FunctionComponent<{}> = () => {
       value = 0;
     }
     updateVolume(value);
-    endUpdateVolume();
   };
 
   const updateVolume = (value) => {
     setVolume(value);
     savedVolume.set(value);
     Howler.volume(value / 100);
-  };
-
-  const endUpdateVolume = () => {
-    if (!isLoading) {
-      sounds['public/tick'].play('tick');
-    }
   };
 
   useEffect(() => {
@@ -50,29 +41,30 @@ const VolumeSlider: FunctionComponent<{}> = () => {
 
   return (
     <>
-      <div className="flex-center-vert">
-        <button onClick={toggleMute}>
-          {volume <= 0 ? (
-            <VolumeX />
-          ) : volume < 20 ? (
-            <Volume />
-          ) : volume < 60 ? (
-            <Volume1 />
-          ) : (
-            <Volume2 />
-          )}
-        </button>
-        <Slider
-          onChange={(value) => void updateVolume(value)}
-          onChangeComplete={() => endUpdateVolume()}
-          value={volume}
-        />
+      <div className="flex items-center justify-center m-1">
+        {volume <= 0 ? (
+          <VolumeOffIcon
+            className="h-5 w-5 mr-2 volume-icon"
+            onClick={toggleMute}
+          />
+        ) : (
+          <VolumeUpIcon
+            className="h-5 w-5 mr-2 volume-icon"
+            onClick={toggleMute}
+          />
+        )}
+        <Slider onChange={(value) => void updateVolume(value)} value={volume} />
       </div>
 
       <style jsx>{`
         button {
           background: transparent;
           border: none;
+        }
+
+        :global(.volume-icon) {
+          cursor: pointer;
+          color: var(--link);
         }
 
         button :global(svg) {
@@ -86,13 +78,13 @@ const VolumeSlider: FunctionComponent<{}> = () => {
           position: relative;
           width: 250px;
           height: 10px;
-          background-color: gray;
+          background-color: var(--muted);
           border-radius: 5px;
         }
 
         :global(.rangeslider-horizontal) :global(.rangeslider__fill) {
           position: absolute;
-          background-color: #3cc;
+          background-color: var(--link);
           height: 10px;
           border-radius: 5px;
         }
@@ -104,8 +96,8 @@ const VolumeSlider: FunctionComponent<{}> = () => {
           top: 50%;
           transform: translate(-50%, -50%);
           border-radius: 50%;
-          border: 3px solid dimgray;
-          background-color: silver;
+          border: 3px solid var(--link);
+          background-color: var(--background);
           cursor: pointer;
         }
 

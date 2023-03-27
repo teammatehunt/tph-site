@@ -31,3 +31,6 @@ application = ProtocolTypeRouter(
         ),
     }
 )
+
+# Django tries to lazy load so force loading imports at initialization
+import tph.urls

@@ -1,0 +1,26 @@
+name: deploy-registration-prod
+
+on:
+  workflow_dispatch:
+
+concurrency: deploy-registration-prod
+
+jobs:
+  deploy-registration-staging:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      # only allow if the main branch or the tag latest
+      assert_branch: main
+      assert_tag: latest
+      DEPLOY_USER: prod
+      DEPLOY_HOST: prod.registration.mypuzzlehunt.com
+      SERVER_ENVIRONMENT: prod
+      REGISTRATION_HOST: registration.mypuzzlehunt.com
+      UVICORN_NUM_PROCS: 3
+      BUILD_SITE: reg
+      EXTRA_ENV: |-
+        SKIP_LARGE_DEPENDENCIES=1
+        GOOGLE_ANALYTICS_ID=FIXME
+        CDN_REGISTRATION_HOST=cdn.registration.mypuzzlehunt.com
+        WWW_REDIRECT=www.registration.mypuzzlehunt.com
+    secrets: inherit

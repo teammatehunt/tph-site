@@ -2,6 +2,9 @@ import { useEffect, useRef } from 'react';
 
 export enum KeyCode {
   TAB = 9,
+  ALT = 18,
+  ENTER = 13,
+  ESC = 27,
   SPACE = 32,
   LEFT = 37,
   UP = 38,

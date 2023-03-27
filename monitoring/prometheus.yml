@@ -1,0 +1,39 @@
+# Config for monitoring via Prometheus.
+# See https://prometheus.io/
+
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+  external_labels:
+    monitor: FIXME-hunt-monitor
+
+# FIXME
+scrape_configs:
+  - job_name: "FIXME-hunt-caddy"
+    metrics_path: /caddy_metrics
+    static_configs:
+      - targets: ["<host here>"]
+    basic_auth:
+      username: teammate
+      password: <pw here>
+  - job_name: "FIXME-hunt-django"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["<host here>"]
+    basic_auth:
+      username: teammate
+      password: <pw here>
+
+#remote_write:
+#  - url: http://localhost:9009/api/v1/push
+#    headers:
+#      X-Scope-OrgID: demo
+
+remote_write:
+  - url: https://prometheus-us-central1.grafana.net/api/prom/push
+    basic_auth:
+      username: 12345678
+      password: <write token here>
+    headers:
+      X-Scope-OrgID: demo

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -e
+REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
+cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
+
+if docker inspect tph &>/dev/null
+then
+  docker run --rm -it -v "$(pwd)/client:/host" -u "$(id -u):$(id -g)" -w /host tph yarn install --non-interactive --modules-folder /tmp/node_modules
+else
+  >&2 echo 'Error: First run `./initialize_dev` to build the image'
+  exit 1
+fi

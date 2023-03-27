@@ -1,0 +1,12 @@
+{% autoescape off %}
+You have successfully registered as an individual solver for {{ hunt_title }}.
+
+We will contact you when we match you with a team.
+
+If you need to modify your information, you can do so at {{ user_link | safe }}. Your username is {{ username }}.
+
+See you at the hunt!
+{{ hunt_organizers }}
+
+This email is not a puzzle.
+{% endautoescape %}

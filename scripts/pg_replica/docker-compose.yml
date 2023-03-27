@@ -1,0 +1,43 @@
+version: '3.7'
+
+services:
+  replica:
+    image: postgres:13.2
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./replica-entrypoint.sh:/replica-entrypoint.sh:ro
+    user: postgres
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=X8b6hGhzUsU3vsPn
+      - TUNNEL=tunnel
+      - TUNNEL_PORT=1234
+    command: /replica-entrypoint.sh
+    depends_on:
+      - tunnel
+  tunnel:
+    image: wbitt/network-multitool:alpine-extra
+    restart: unless-stopped
+    # forward traffic from tunnel:1234 to the remote docker postgres:5432
+    # securely using socat[local] -> ssh -> socat[remote docker].
+    # NB: bash -x prints the command
+    # NB: running the remote socat from within the docker network is needed for
+    #     compatibility with rootless docker (which shouldn't be running in
+    #     prod but which we use for testing/staging)
+    command: >-
+      bash -xc "socat TCP4-LISTEN:$${TUNNEL_PORT},fork,reuseaddr
+      \"EXEC:ssh $${PRIMARY:?} docker run --rm -i --network $${PROJECT}_default alpine/socat - TCP4\:db\:5432\"
+      "
+    environment:
+      - TUNNEL_PORT=1234
+      - PRIMARY=testing@testing.teammatehunt.com
+      - PROJECT=tph
+    expose:
+      - 1234
+    volumes:
+      - ${HOME}/.ssh:/root/.ssh:ro
+
+volumes:
+  pgdata:

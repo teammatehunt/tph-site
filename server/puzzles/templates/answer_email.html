@@ -26,7 +26,7 @@
         <tr>
             <th>
                 {% if email_request.team %}
-                <a href="/team/{{ email_request.team.team_name|urlencode:"" }}">
+                <a href="/team/{{ email_request.team.name|urlencode:"" }}">
                     {{ email_request.team }}
                 </a>
                 {% else %}

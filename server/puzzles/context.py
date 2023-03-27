@@ -3,26 +3,35 @@
 # "context processors". But it also does some stuff with caching computed
 # properties of teams (the caching is only within a single request (?)). See
 # https://docs.djangoproject.com/en/3.1/ref/templates/api/#using-requestcontext
+import collections
 import datetime
 import inspect
+import logging
 import types
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils import timezone
+from spoilr.core.api.hunt import get_site_launch_time, is_site_closed, is_site_over
+from spoilr.core.models import HQUpdate
+from spoilr.email.models import Email
 
 from puzzles import models
 from puzzles.hunt_config import (
-    HUNT_TITLE,
-    HUNT_ORGANIZERS,
-    DAYS_BEFORE_HINTS,
     DEEP_MAX,
-    HUNT_CLOSE_TIME,
-    HUNT_END_TIME,
-    HUNT_START_TIME,
-    INTRO_META_SLUGS,
-    META_META_SLUG,
+    DEEP_PER_ROUND,
+    DEEP_PER_SLUG,
+    DONE_SLUG,
+    EVENTS_ROUND_SLUG,
+    HUNT_ORGANIZERS,
+    HUNT_TITLE,
 )
+from puzzles.models.story import StateEnum
 from puzzles.shortcuts import get_shortcuts
+
+User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def context_middleware(get_response):
@@ -101,51 +110,52 @@ class BaseContext:
         return HUNT_ORGANIZERS
 
     def now(self):
-        return timezone.localtime()
+        return timezone.now()
 
     def start_time(self):
         return (
-            HUNT_START_TIME - self.team.start_offset if self.team else HUNT_START_TIME
+            get_site_launch_time() - self.team.start_offset
+            if self.team
+            else get_site_launch_time()
         )
 
-    def end_time(self):
-        return HUNT_END_TIME
-
-    def close_time(self):
-        return HUNT_CLOSE_TIME
-
     def hint_time(self):
-        return self.start_time + datetime.timedelta(days=DAYS_BEFORE_HINTS)
+        return self.start_time
 
     # XXX do NOT name this the same as a field on the actual Team model or
     # you'll silently be unable to update that field because you'll be writing
     # to this instead of the actual model field!
     def hunt_is_prereleased(self):
-        return self.team and self.team.is_prerelease_testsolver
+        return self.team and (
+            self.team.is_prerelease_testsolver or self.team.is_internal
+        )
 
     def hunt_has_started(self):
         return self.hunt_is_prereleased or self.now >= self.start_time
 
     def hunt_has_almost_started(self):
-        return self.start_time - self.now < datetime.timedelta(hours=1)
+        return (
+            self.hunt_is_prereleased
+            or self.start_time - self.now < datetime.timedelta(hours=1)
+        )
 
     def hunt_is_over(self):
-        return self.now >= self.end_time
+        return is_site_over()
 
     def hunt_is_closed(self):
-        return self.now >= self.close_time
+        return is_site_closed()
+
+    def correct_puzzle_submissions(self):
+        if not self.team:
+            return []
+
+        return self.team.correct_puzzle_submissions()
 
     def deep(self):
-        return models.Team.compute_deep(self)
-
-    def metameta_deep(self):
-        return models.Team.compute_metameta_deep(self)
-
-    def display_deep(self):
-        return "\u221e" if self.deep == DEEP_MAX else int(self.deep)
-
-    def solves_per_round(self):
-        return models.Team.compute_solves_per_round(self)
+        if not self.team:
+            # TODO handle end-of-hunt.
+            return collections.defaultdict(lambda: -1)
+        return self.team.compute_deep(self.correct_puzzle_submissions)
 
 
 # In theory, `Context` properties are things that don't make sense if all the
@@ -160,87 +170,107 @@ class Context:
         return self.request.user.is_superuser
 
     def team(self):
-        return getattr(self.request.user, "team", None)
+        # user is a spoilr User. Its team field is the spoilr Team. To get the tph
+        # Team, follow the 1:1 created implicitly by Django's concrete inheritance.
+        if not self.request.user or self.request.user.is_anonymous:
+            return None
+
+        spoilr_team = self.request.user.team
+        if not spoilr_team:
+            return None
+
+        return spoilr_team.team
+
+    def site(self):
+        """One of None, 'hunt', 'registration'"""
+        from tph.utils import get_site
+
+        return get_site(self.request)
+
+    def story_state(self):
+        if settings.IS_POSTHUNT:
+            return StateEnum.STORY_COMPLETE
+
+        if self.team:
+            return self.team.story_state
+
+        return StateEnum.DEFAULT
+
+    def _internal_num_event_rewards(self):
+        # Logic similar to intro hints - returns normal + strong events and expects client to
+        # handle displaying the diff.
+        if not self.team:
+            return 0, 0, [], []
+        return self.team.compute_internal_num_event_rewards()
+
+    def num_event_rewards(self):
+        # Context weirdness makes this a property function automatically.
+        normal, _, _, _ = self._internal_num_event_rewards
+        return normal
+
+    def num_a3_event_rewards(self):
+        # Context weirdness makes this a property function automatically.
+        _, a3, _, _ = self._internal_num_event_rewards
+        return a3
 
     def shortcuts(self):
         return tuple(get_shortcuts(self))
 
-    def num_hints_remaining(self):
-        return self.team.num_hints_remaining if self.team else 0
-
-    def num_free_answers_remaining(self):
-        return self.team.num_free_answers_remaining if self.team else 0
-
-    def submissions(self):
-        return self.team.submissions if self.team else []
-
     def puzzle_unlocks(self):
-        return models.Team.compute_puzzle_unlocks(self)
+        """May unlock new puzzles or advance story state as a side effect."""
+        if not self.team:
+            return []
 
-    def story_unlocks(self):
-        return models.Team.compute_story_unlocks(self)
-
-    def unlocks(self):
-        unlocks = {}
-        unlocks.update(self.puzzle_unlocks)
-        unlocks.update(self.story_unlocks)
-        return unlocks
+        return self.team.unlock_puzzles(self.deep)
 
     def is_unlocked(self, slug):
-        # Only checks for puzzle unlocks, not story unlocks.
+        # Only checks for puzzle unlocks
         puzzle = None
-        if self.hunt_has_started or self.hunt_is_prereleased or self.is_superuser:
-            for puzzle_data in self.puzzle_unlocks["puzzles"]:
-                _puzzle = puzzle_data["puzzle"]
+        if (
+            self.hunt_has_started
+            or self.is_superuser
+            or (self.team and self.team.is_internal)
+        ):
+            if settings.SERVER_ENVIRONMENT == "test_branch":
+                from puzzles.debug import load_puzzle_from_branch_fixture
+
+                # Dynamically load puzzle from branch fixture
+                # TODO: Currently the request will fail if the fixture
+                # conflicts with unique constraints. Determine if we want
+                # to handle this differently.
+                load_puzzle_from_branch_fixture(self.request, slug)
+            for _puzzle in self.puzzle_unlocks:
                 if _puzzle.slug == slug:
                     puzzle = _puzzle
                     break
         if puzzle is None and settings.IS_PYODIDE:
             # On static site, unlock on first request.
-            # This is primarily needed for Oxford Fiesta.
             if self.team is not None:
                 puzzle = models.Puzzle.objects.filter(slug=slug).first()
                 if puzzle is not None:
-                    models.PuzzleUnlock.objects.get_or_create(
+                    models.PuzzleAccess.objects.get_or_create(
                         team=self.team, puzzle=puzzle
                     )
         return (puzzle is not None, puzzle)
 
-    def is_subpuzzle_unlocked(self, slug, subpuzzle):
-        """Whether subpuzzle is unlocked given slug is unlocked"""
-        from puzzles.views.puzzles import dc_meet_and_greet
-
-        if slug == dc_meet_and_greet.PUZZLE_SLUG:
-            return dc_meet_and_greet.is_subpuzzle_unlocked(self.team, subpuzzle)
+    def is_minipuzzle_unlocked(self, slug, minipuzzle):
+        """Whether minipuzzle is unlocked given slug is unlocked"""
+        # TODO: Add mapping for minipuzzles?
         return True
-
-    def is_main_round_unlocked(self):
-        if self.is_superuser:
-            return True
-        team = self.team
-        # First condition needed to stop main round from unlocking if 0 objects
-        # exist, which might occur depending on DB state in prod.
-        return bool(
-            INTRO_META_SLUGS
-            and models.AnswerSubmission.objects.filter(
-                team=team, puzzle__slug__in=INTRO_META_SLUGS, is_correct=True
-            ).count()
-            == len(INTRO_META_SLUGS)
-        )
 
     def is_hunt_complete(self):
         team = self.team
-        return (
-            self.is_superuser
-            or models.AnswerSubmission.objects.filter(
-                team=team, puzzle__slug=META_META_SLUG, is_correct=True
+        return self.is_superuser or (
+            team
+            and models.PuzzleSubmission.objects.filter(
+                team_id=team.id, puzzle__slug=DONE_SLUG, correct=True
             ).exists()
         )
 
     def errata(self):
         """Errata for all unlocked puzzles."""
         errata_models = (
-            models.Errata.objects.filter(puzzle__id__in=(self.unlocks["ids"]))
+            HQUpdate.objects.filter(puzzle__in=self.puzzle_unlocks)
             .select_related("puzzle")
             .order_by("creation_time")
         )
@@ -249,24 +279,28 @@ class Context:
     def all_puzzles(self):
         return tuple(models.Puzzle.objects.prefetch_related("metas").order_by("deep"))
 
-    def all_story(self):
-        return tuple(
-            models.StoryCard.objects.select_related("puzzle").order_by(
-                "deep", "unlock_order", "slug"
-            )
-        )
-
     def puzzle(self):
         return None  # set by validate_puzzle
 
     def puzzle_answer(self):
-        return self.team and self.puzzle and self.team.puzzle_answer(self.puzzle)
+        """Returns the puzzle answer only if it's solved."""
+        return (
+            self.team
+            and self.puzzle
+            and self.team.puzzle_answer(self.puzzle, self.puzzle_submissions)
+        )
 
     def guesses_remaining(self):
-        return self.team and self.puzzle and self.team.guesses_remaining(self.puzzle)
+        return (
+            self.team
+            and self.puzzle
+            and self.team.guesses_remaining(self.puzzle, self.puzzle_submissions)
+        )
 
     def puzzle_submissions(self):
-        return self.team and self.puzzle and self.team.puzzle_submissions(self.puzzle)
+        if not (self.team and self.puzzle):
+            return []
+        return self.team.puzzle_submissions(self.puzzle)
 
     def num_unclaimed_hints(self):
         # import here to avoid circular dependency
@@ -303,10 +337,10 @@ class Context:
             # This will count multiple emails in the same thread. A complicated
             # query to count threads is probably not worth it and could have
             # detrimental runtime effects.
-            return models.Email.objects.filter(
+            return Email.objects.filter(
                 is_from_us=False,
                 is_spam=False,
-                status=models.Email.RECEIVED_NO_REPLY,
+                status=Email.RECEIVED_NO_REPLY,
                 claimed_datetime__isnull=True,
             ).count()
 
@@ -318,10 +352,10 @@ class Context:
 
         @restrict_access()
         def _num_unsent_emails(self):
-            cooldown = datetime.timedelta(seconds=models.Email.RESEND_COOLDOWN)
+            cooldown = datetime.timedelta(seconds=Email.RESEND_COOLDOWN)
             now = timezone.now()
             return (
-                models.Email.objects.filter(status=models.Email.SENDING)
+                Email.objects.filter(status=Email.SENDING)
                 .exclude(scheduled_datetime__gt=now)
                 .exclude(attempted_send_datetime__gt=now - cooldown)
                 # exclude when all address lists are empty

@@ -19,7 +19,7 @@ const Appendix: FC<Props> = ({
   children,
 }) => (
   <>
-    <h4 id={`appendix-${id}`}>{title}</h4>
+    <h2 id={`appendix-${id}`}>{title}</h2>
     {children}
   </>
 );

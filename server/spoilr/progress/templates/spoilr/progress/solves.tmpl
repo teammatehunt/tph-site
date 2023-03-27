@@ -1,0 +1,293 @@
+{% extends "hq/public_layout.tmpl" %}
+{% load static %}
+
+{% block title %}Hunt Stats{% endblock %}
+{% block heading %}Hunt Stats{% endblock %}
+
+{% block content %}
+{% comment %} FIXME(update): Update this for your hunt {% endcomment %}
+{% endblock content %}
+
+{% block stylesheets %}
+<style type="text/css">
+  .chart-container {
+    aspect-ratio: 16/9;
+    position: relative;
+    width: 100%;
+  }
+</style>
+{% endblock %}
+
+{% block scripts %}
+{{ solve_counts_for_chartjs|json_script:"solve-counts" }}
+{{ hint_counts_for_chartjs|json_script:"hint-counts" }}
+{{ contacthq_counts_for_chartjs|json_script:"contacthq-counts" }}
+{{ freeanswer_counts_for_chartjs|json_script:"freeanswer-counts" }}
+{{ solves_by_size_for_chartjs|json_script:"solves-by-size" }}
+{{ solves_by_guesses_for_chartjs|json_script:"solves-by-guesses" }}
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
+<!-- Tried migrating to charts V3 and slowdown was noticeable on large charts -->
+<!-- Shame since legend maxHeight is only defined in V3 onwards -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+<script type="module">
+const TIME_BUFFER_MS = 60 * 60 * 1000;
+
+// Copy-pasted from below but without the "at least N solves" filter
+function plotGraph(jsonName, chartId) {
+  const counts = JSON.parse(document.getElementById(jsonName).textContent);
+  const canvas = $("<canvas>").attr("id", `${jsonName}-canvas`);
+  let startTimestamp, endTimestamp;
+
+  for (const dataset of counts.datasets) {
+    for (const datum of dataset.data) {
+      if (!startTimestamp || datum.x < startTimestamp) {
+        startTimestamp = datum.x;
+      }
+      if (!endTimestamp || datum.x > endTimestamp) {
+        endTimestamp = datum.x;
+      }
+    }
+  }
+
+  // chartjs creates a couple other elements in the container with event
+  // handlers it sets up, so we need to clear those out before we try to
+  // render the chart again inside the same container
+  $(chartId)
+    .empty()
+    .append(canvas);
+  new Chart(canvas[0], {
+    type: 'line',
+    data: counts,
+    options: {
+      scales: {
+        xAxes: [{
+          type: 'time',
+          ticks: {
+            min: startTimestamp - TIME_BUFFER_MS,
+            max: endTimestamp + TIME_BUFFER_MS,
+            maxTicksLimit: 20,
+          },
+          time: {
+            unit: 'hour',
+            displayFormats: {
+              hour: 'ddd hA'
+            },
+            parser: moment,
+          },
+          position: 'bottom',
+        }],
+        yAxes: [{
+          ticks: {
+            beginAtZero: true
+          }
+        }]
+      },
+    }
+  });
+}
+
+function refreshGraph(minThreshold, maxThreshold) {
+  // FIXME(update): Update this for your hunt
+  const solveCounts = JSON.parse(document.getElementById('solve-counts').textContent);
+
+  const numSolves = [];
+  for (let i = 0; i < solveCounts.datasets.length; i++) {
+    numSolves.push(solveCounts.datasets[i].data[solveCounts.datasets[i].data.length-1].y);
+  }
+
+  const imageSrc = {
+    'FIXME': 'FIXME',
+  };
+
+  let startTimestamp, endTimestamp;
+  for (const dataset of solveCounts.datasets) {
+    for (const datum of dataset.data) {
+      if (!startTimestamp || datum.x < startTimestamp) {
+        startTimestamp = datum.x;
+      }
+      if (!endTimestamp || datum.x > endTimestamp) {
+        endTimestamp = datum.x;
+      }
+    }
+    dataset.pointStyle = dataset.pointStyle.map((pair) => {
+        if (pair !== 'circle') {
+            const src = pair[0];
+            const size = pair[1];
+            const img = new Image(size, size);
+            img.src = src;
+            return img;
+        }
+        return pair;  // the original value
+    });
+  }
+
+  if (!startTimestamp) {
+    console.log('No solve data yet!');
+    return;
+  }
+
+  solveCounts.datasets = solveCounts.datasets.filter((d, i) => numSolves[i] >= minThreshold && numSolves[i] <= maxThreshold);
+  solveCounts.pointLabels = solveCounts.pointLabels.filter((d, i) => numSolves[i] >= minThreshold && numSolves[i] <= maxThreshold);
+
+  solveCounts.datasets.forEach((o) => {
+    o.lineTension = 0;
+    o.steppedLine = true;
+  });
+
+  const canvas = $("<canvas>").attr("id", "solve-chart-canvas");
+
+  // chartjs creates a couple other elements in the container with event
+  // handlers it sets up, so we need to clear those out before we try to
+  // render the chart again inside the same container
+  $("#solve-chart")
+    .empty()
+    .append(canvas);
+
+  let chartInstance = new Chart(canvas[0], {
+    type: 'line',
+    data: solveCounts,
+    options: {
+      maintainAspectRatio: false,
+      legend: {
+        fullWidth: false,
+      },
+      tooltips: {
+        callbacks: {
+          label: function(tooltipItem, data) {
+            return solveCounts.pointLabels[tooltipItem.datasetIndex][tooltipItem.index];
+          }
+        }
+      },
+      scales: {
+        xAxes: [{
+          type: 'time',
+          ticks: {
+            min: startTimestamp - TIME_BUFFER_MS,
+            max: endTimestamp + TIME_BUFFER_MS,
+            maxTicksLimit: 20,
+          },
+          time: {
+            unit: 'hour',
+            displayFormats: {
+              hour: 'ddd hA'
+            },
+            parser: moment,
+          },
+          position: 'bottom',
+        }],
+        yAxes: [{
+          ticks: {
+            beginAtZero: true,
+            suggestedMax: Math.min(maxThreshold + 20, {{max_solves}}),
+          }
+        }]
+      },
+    }
+  });
+  // Connect the show / hide all buttons for solve graph
+  // Based on https://stackoverflow.com/questions/49249902/select-all-and-unselect-option-for-chart-js/49252102#49252102
+  $("#show").click(() => {
+    chartInstance.data.datasets.forEach((ds) => {
+        ds.hidden = false;
+    });
+    chartInstance.update();
+  });
+  $("#hide").click(() => {
+    chartInstance.data.datasets.forEach((ds) => {
+        ds.hidden = true;
+    });
+    chartInstance.update();
+  });
+}
+
+function bubbleChart(bubbleName, bubbleId, xLabel, labelCallback) {
+  const teamSizeData = JSON.parse(document.getElementById(bubbleName).textContent);
+  const canvas = $("<canvas>").attr("id", `${bubbleName}-canvas`);
+
+  $(bubbleId)
+    .empty()
+    .append(canvas);
+  new Chart(canvas[0], {
+    type: 'bubble',
+    data: teamSizeData,
+    options: {
+      legend: {
+        display: false
+      },
+      tooltips: {
+        callbacks: {
+          // array = render each on a new line
+          label: labelCallback,
+        }
+      },
+      scales: {
+        xAxes: [{
+          scaleLabel: {
+            display: true,
+            labelString: xLabel,
+          },
+          ticks: {
+            beginAtZero: true,
+          },
+        }],
+        yAxes: [{
+          scaleLabel: {
+            display: true,
+            labelString: 'Solves',
+          },
+          ticks: {
+            beginAtZero: true,
+            suggestedMax: {{max_solves}},
+          },
+        }]
+      },
+    }
+  });
+  // From https://stackoverflow.com/questions/41044011/can-individual-bubbles-in-a-chartjs-bubble-chart-have-labels
+  Chart.plugins.register({
+    id: `${bubbleName}-label`,
+    afterDatasetsDraw: function(chart, args, options) {
+      var ctx = chart.ctx;
+
+      chart.data.datasets.forEach(function(dataset, i) {
+        var meta = chart.getDatasetMeta(i);
+        if (meta.type == "bubble") {
+          meta.data.forEach(function(element, index) {
+            // Draw the text in black, with the specified font
+            ctx.fillStyle = 'rgb(0, 0, 0)';
+            var fontSize = 13;
+            var fontStyle = 'normal';
+            var fontFamily = 'DM Sans, sans-serif';
+            ctx.font = Chart.helpers.fontString(fontSize, fontStyle, fontFamily);
+
+            // Make sure alignment settings are correct
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            var position = element.tooltipPosition();
+            ctx.fillText(dataset.label.toString(), position.x, position.y - fontSize);
+          });
+        } //if
+      });
+    }
+  });
+}
+
+// TODO(sahil): Save the most recent min solves setting in local storage.
+refreshGraph(parseInt($('.min-solves')[0].value), parseInt($('.max-solves')[0].value));
+$(".min-solves").change((e) => {
+  refreshGraph(parseInt(e.target.value), parseInt($('.max-solves')[0].value));
+});
+$(".max-solves").change((e) => {
+  refreshGraph(parseInt($('.min-solves')[0].value), parseInt(e.target.value));
+});
+plotGraph("hint-counts", "#hint-chart");
+plotGraph("contacthq-counts", "#hq-chart");
+plotGraph("freeanswer-counts", "#freeanswer-chart");
+const solveLabelCallback = (t, d) => ([`${d.datasets[t.datasetIndex].label}`, `Team Size: ${t.xLabel}`, `Solves: ${t.yLabel}`]);
+const guessLabelCallback = (t, d) => ([`${d.datasets[t.datasetIndex].label}`, `Guesses: ${t.xLabel}`, `Solves: ${t.yLabel}`]);
+bubbleChart("solves-by-size", "#teamsize-chart", 'Team Size', solveLabelCallback);
+bubbleChart("solves-by-guesses", "#guesses-chart", 'Guesses', guessLabelCallback);
+</script>
+{% include 'hq/util/auto-reload-script.tmpl' %}
+{% endblock scripts %}

@@ -1,0 +1,21 @@
+version: '3.7'
+
+services:
+  tph:
+    build:
+      args:
+        ENABLE_HUNT_SITE: 0
+        ENABLE_POSTHUNT_SITE: 1
+    environment:
+      - SERVER_ENVIRONMENT=posthunt
+      - ENABLE_HUNT_SITE=0
+      - ENABLE_POSTHUNT_SITE=1
+      - POSTHUNT_HOST=localhost:8084
+      - CADDY_POSTHUNT_HOST=localhost:8084
+      - CDN_REGISTRATION_HOST=/2023
+      - CDN_HUNT_HOST=/2023
+      - HUNT_HOST=mypuzzlehunt.com
+      - REGISTRATION_HOST=registration.mypuzzlehunt.com
+    ports:
+      - '127.0.0.1:8084:8084'
+      - '127.0.0.1:8084:8084/udp'

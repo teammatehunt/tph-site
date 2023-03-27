@@ -1,0 +1,29 @@
+name: deploy-posthunt-staging
+
+on:
+  workflow_dispatch:
+
+concurrency: deploy-posthunt-staging
+
+jobs:
+  deploy-posthunt-staging:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      DEPLOY_USER: staging
+      DEPLOY_HOST: staging.teammatehunt.com
+      SERVER_ENVIRONMENT: posthunt
+      BUILD_SITE: posthunt-reg
+      POSTHUNT_HOST: staging.teammatehunt.com
+      # scale to number of cores
+      UVICORN_NUM_PROCS: 1
+      CELERY_NUM_PROCS: 1
+      COPY_DRIVE_CREDS: 1
+      EXTRA_ENV: |-
+        # serve HTTP on 172.17.0.1:25080
+        SERVER_HTTP_BIND_PREFIX=172.17.0.1:25
+        GOOGLE_ANALYTICS_ID=FIXME
+        CDN_HUNT_HOST=/2023
+        CDN_REGISTRATION_HOST=/2023
+        HUNT_HOST=mypuzzlehunt.com
+        REGISTRATION_HOST=registration.mypuzzlehunt.com
+    secrets: inherit

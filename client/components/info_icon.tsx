@@ -1,75 +1,91 @@
-import React, { FunctionComponent, ReactFragment } from 'react';
+import React, { FC, HTMLProps, ReactFragment } from 'react';
+import cx from 'classnames';
 import dynamic from 'next/dynamic';
-import { AlertTriangle, Info } from 'react-feather';
-
-import { Normal } from 'components/copy';
+import {
+  ExclamationIcon,
+  InformationCircleIcon,
+} from '@heroicons/react/outline';
 
 const ReactTooltip = dynamic(() => import('react-tooltip'), {
   ssr: false,
 });
 
 interface Props {
+  border?: boolean;
   color?: string;
   center?: boolean;
   warning?: boolean;
   tooltipMessage?: ReactFragment;
+  // If provided, use an existing ReactTooltip on the page.
+  tooltipId?: string;
+  tooltipClassname?: string;
 }
 
 /**
  * Shows a little info (i) icon with a tooltip for help text.
  * Generally used for accessibility / explanations that are puzzle content.
  */
-const InfoIcon: FunctionComponent<Props> = ({
+const InfoIcon: FC<Props & HTMLProps<HTMLSpanElement>> = ({
   color,
   tooltipMessage,
+  tooltipId,
+  tooltipClassname,
+  border = false,
   center = false,
   warning = false,
+  className,
   children,
 }) => {
-  const Component = warning ? AlertTriangle : Info;
+  const Component = warning ? ExclamationIcon : InformationCircleIcon;
   return (
     <>
-      <div className={center ? 'flex-center-vert' : undefined}>
-        <span className="icon">
-          <Component data-tip="" data-for="info-tooltip" />
-        </span>
-        <span>{children}</span>
+      <div
+        className={cx('flex rounded-md items-center space-x-2', {
+          'justify-center': center,
+          'border border-dashed border-black dark:border-white p-2': border,
+        })}
+      >
+        <Component
+          className="h-6 w-6 min-w-[1.5rem]"
+          data-tip={tooltipId ? tooltipMessage : ''}
+          data-for={tooltipId ?? 'info-tooltip'}
+        />
+        <span className={className}>{children}</span>
       </div>
-      {tooltipMessage && (
+      {tooltipMessage && !tooltipId && (
         <ReactTooltip
           id="info-tooltip"
           effect="solid"
-          getContent={() => <span className="message">{tooltipMessage}</span>}
+          getContent={() => (
+            <span className={tooltipClassname || 'message'}>
+              {tooltipMessage}
+            </span>
+          )}
         />
       )}
-      <Normal />
 
       <style jsx>{`
         div {
-          align-items: center;
           color: ${color ?? '#555'};
-          display: flex;
         }
 
         /* Override color in dark mode, unless on a light background. */
-        :global(.darkmode section:not(.background)) div {
-          color: var(--primary);
+        :global(.darkmode) div {
+          color: ${color ?? 'var(--white)'};
         }
 
-        .icon {
-          margin: 8px 12px 0 0;
-        }
-
-        .flex-center-vert .icon {
-          margin-top: 0;
-        }
-
-        .flex-center-vert :global(img) {
+        .justify-center :global(img) {
           vertical-align: middle;
         }
 
         .message {
           font-family: 'Roboto', sans-serif;
+        }
+
+        @media print {
+          :global(.darkmode) div {
+            color: black;
+          }
         }
       `}</style>
     </>

@@ -3,10 +3,10 @@ set -e
 REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
 cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
 
-if $(docker-compose exec tph bash -c '[[ "$SERVER_ENVIRONMENT" == dev ]]')
+if docker inspect tph &>/dev/null
 then
-  docker-compose exec -u "$(id -u):$(id -g)" tph /app/server/manage.py makemigrations
+  docker run --rm -it -v "$(pwd):/app" -u "$(id -u):$(id -g)" tph /app/server/manage.py makemigrations
 else
-  >&2 echo Error: Is the dev environment running?
+  >&2 echo 'Error: First run `./initialize_dev` to build the image'
   exit 1
 fi

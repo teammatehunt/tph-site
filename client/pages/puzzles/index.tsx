@@ -1,30 +1,24 @@
-import React, { FunctionComponent, useContext } from 'react';
-import Head from 'next/head';
-import dynamic from 'next/dynamic';
+import React from 'react';
 
 import Custom404 from 'pages/404';
 import Section from 'components/section';
-import PuzzlesList, {
-  getPuzzlesListProps,
-  Props as PuzzlesListProps,
-} from 'components/puzzles_list';
-import banner from 'assets/public/logo.png';
+import Title from 'components/title';
+import PuzzlesList, { getPuzzlesListProps } from 'components/puzzles_list';
+import { RoundProps } from 'components/puzzles_map';
+import PuzzleApiComment from 'components/puzzle_api_comment';
 
-const PuzzlesPage = ({ puzzles }: PuzzlesListProps) => {
+const PuzzlesPage = ({ puzzles, rounds }: RoundProps) => {
+  if (!Object.keys(puzzles).length) {
+    return <Custom404 />;
+  }
+
   return (
-    <div>
-      <Head>
-        <title>List of Puzzles</title>
-      </Head>
-
-      <Section>
-        {Object.keys(puzzles).length ? (
-          <PuzzlesList puzzles={puzzles} />
-        ) : (
-          <Custom404 />
-        )}
+    <>
+      <PuzzleApiComment />
+      <Section title="All Puzzles">
+        <PuzzlesList puzzles={puzzles} rounds={rounds} />
       </Section>
-    </div>
+    </>
   );
 };
 

@@ -1,8 +1,10 @@
 {% autoescape off %}
-You have successfully registered team {{ team_name }} for the {{ hunt_title }}.
+You have successfully registered team {{ name }} for {{ hunt_title }}.
 
 If you need to modify your team information, you can do so at {{ team_link | safe }}. Your team username is {{ username }}.
 
 See you at the hunt!
 {{ hunt_organizers }}
+
+This email is not a puzzle.
 {% endautoescape %}

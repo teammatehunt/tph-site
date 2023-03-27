@@ -1,0 +1,68 @@
+name: docker-buildx-base
+
+env:
+  # You can continue to use this image as a build environment
+  BUILDX_CONTAINER: registry.gitlab.com/teammate/docker-with-buildx:20.10.18-0.9.1
+  # FIXME: Change these to your own container registry
+  CI_REGISTRY: registry.gitlab.com
+  CI_REGISTRY_IMAGE: registry.gitlab.com/teammate/mh-2023/mh-2023
+
+on:
+  workflow_call:
+    inputs:
+      push:
+        type: string
+      cache:
+        type: string
+      ENABLE_HUNT_SITE:
+        type: string
+      ENABLE_REGISTRATION_SITE:
+        type: string
+      ENABLE_POSTHUNT_SITE:
+        type: string
+
+jobs:
+  buildx:
+    name: Build docker
+    runs-on: ubuntu-latest
+    container: registry.gitlab.com/teammate/docker-with-buildx:20.10.18-0.9.1
+    steps:
+      - name: Set env
+        run: |
+          export ENABLE_HUNT_SITE=${{ inputs.ENABLE_HUNT_SITE }}
+          export ENABLE_REGISTRATION_SITE=${{ inputs.ENABLE_REGISTRATION_SITE }}
+          export ENABLE_POSTHUNT_SITE=${{ inputs.ENABLE_POSTHUNT_SITE }}
+          export IMAGE_PREFIX="${ENABLE_POSTHUNT_SITE:+posthunt-}${ENABLE_REGISTRATION_SITE:+${ENABLE_HUNT_SITE:+hunt-}reg-}"
+          export CI_COMMIT_SHORT_SHA=${GITHUB_SHA::8}
+          export CI_COMMIT_REF_SLUG=${GITHUB_REF_NAME//[^[:alnum:]_]/-}
+          export IMAGE_TAG_SHA=$CI_REGISTRY_IMAGE:${IMAGE_PREFIX}sha-$CI_COMMIT_SHORT_SHA
+          export IMAGE_TAG_BRANCH=$CI_REGISTRY_IMAGE:${IMAGE_PREFIX}branch-$CI_COMMIT_REF_SLUG
+          export IMAGE_TAG_BRANCH_CACHE=$CI_REGISTRY_IMAGE/cache:${IMAGE_PREFIX}$CI_COMMIT_REF_SLUG
+          export IMAGE_TAG_MAIN_CACHE=$CI_REGISTRY_IMAGE/cache:${IMAGE_PREFIX}main
+          export IMAGE_TAG_STAGING_CACHE=$CI_REGISTRY_IMAGE/cache:${IMAGE_PREFIX}staging
+          export IMAGE_TAG_LATEST=$CI_REGISTRY_IMAGE:${IMAGE_PREFIX}latest
+          export BUILDX_PUSH=${{ inputs.push }}
+          export BUILDX_CACHE=${{ inputs.cache }}
+          # Export env to be reused in later steps. Like `env >> $GITHUB_ENV` but works with multiline values
+          env -0 | tr '\n' '\r' | tr '\0' '\n' | cut -s -d'=' -f1 | xargs -I{} sh -c 'printf "{}<<ENV_EOF\n%s\nENV_EOF\n" "${}"' >> $GITHUB_ENV
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup docker
+        run: |
+          docker login -u ${{ secrets.CI_REGISTRY_USER }} -p ${{ secrets.CI_REGISTRY_PASSWORD }} $CI_REGISTRY
+          docker context create tls-environment
+          docker buildx create --use --name tph-builder tls-environment
+      - name: Build
+        run: >-
+          docker buildx build
+          --build-arg ENABLE_HUNT_SITE="${ENABLE_HUNT_SITE}"
+          --build-arg ENABLE_REGISTRATION_SITE="${ENABLE_REGISTRATION_SITE}"
+          --build-arg ENABLE_POSTHUNT_SITE="${ENABLE_POSTHUNT_SITE}"
+          --cache-from $IMAGE_TAG_BRANCH_CACHE
+          --cache-from $IMAGE_TAG_MAIN_CACHE
+          --cache-from $IMAGE_TAG_STAGING_CACHE
+          ${BUILDX_CACHE:+--cache-to type=registry,mode=max,ref=$IMAGE_TAG_BRANCH_CACHE}
+          ${BUILDX_PUSH:+--tag $IMAGE_TAG_SHA}
+          ${BUILDX_PUSH:+--tag $IMAGE_TAG_BRANCH}
+          ${BUILDX_PUSH:+--push}
+          .

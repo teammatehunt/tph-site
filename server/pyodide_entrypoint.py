@@ -9,45 +9,42 @@ from pathlib import Path
 import zipfile
 
 # FIXME
+INDEXEDDB_PREFIX = "2023-"
 os.environ["SERVER_HOSTNAME"] = "mypuzzlehunt.com"
 os.makedirs("/srv", exist_ok=True)
 print("Caching site packages")
 compression = zipfile.ZIP_DEFLATED
 with zipfile.ZipFile(
-    "/indexeddb/site-packages.zip", "a", compression=compression
+    f"/{INDEXEDDB_PREFIX}indexeddb/site-packages.zip", "a", compression=compression
 ) as zippedf:
     with zipfile.ZipFile(
-        "/indexeddb/immovable-site-packages.zip", "a", compression=compression
+        f"/{INDEXEDDB_PREFIX}indexeddb/immovable-packages.zip",
+        "a",
+        compression=compression,
     ) as immovablef:
-        ignore_prefixes = [
-            "pyodide",
-            "_pyodide",
-        ]
         immovable_prefixes = [
-            "_distutils",
             "PIL",
-            "Pillow",
-            "pkg_resources",
-            "pyparsing",
-            "setuptools",
+            "sqlite3",
+            "_sqlite3",
         ]
-        site_packages = "/lib/python3.9/site-packages"
-        for parent, dirs, filenames in os.walk(site_packages):
-            rel_parent = os.path.relpath(parent, site_packages)
-            is_ignore = False
-            is_immovable = False
-            for prefix in ignore_prefixes:
-                if rel_parent.startswith(prefix):
-                    is_ignore = True
-            if is_ignore:
-                continue
-            for prefix in immovable_prefixes:
-                if rel_parent.startswith(prefix):
-                    is_immovable = True
-            zipf = immovablef if is_immovable else zippedf
+        packages = "/lib/python3.10"
+        site_packages = f"{packages}/site-packages"
+        for parent, dirs, filenames in os.walk(packages):
             for filename in filenames:
                 path = os.path.join(parent, filename)
-                relpath = os.path.relpath(path, site_packages)
+                rel_packages = os.path.relpath(path, packages)
+                rel_site_packages = os.path.relpath(path, site_packages)
+                is_immovable = False
+                for prefix in immovable_prefixes:
+                    # some of the immovable packages are standard library
+                    if rel_packages.startswith(prefix) or rel_site_packages.startswith(
+                        prefix
+                    ):
+                        is_immovable = True
+                if not is_immovable and not parent.startswith(site_packages):
+                    continue
+                zipf = immovablef if is_immovable else zippedf
+                relpath = rel_packages if is_immovable else rel_site_packages
                 try:
                     zipf.getinfo(relpath)
                 except KeyError:
@@ -74,7 +71,7 @@ django.setup()
 from tph.utils import sync_indexeddb, reset_db
 
 print("Updating database")
-dbcrc_path = Path("/indexeddb/dbcrc.txt")
+dbcrc_path = Path(f"/{INDEXEDDB_PREFIX}indexeddb/dbcrc.txt")
 db_old_crc = None
 if dbcrc_path.is_file():
     with open(dbcrc_path) as f:

@@ -1,0 +1,34 @@
+/* FIXME: Variables for intro round */
+/* Override these variables with colors for main rounds */
+:root {
+  --title-font: Quicksand;
+  --serif-font: Quicksand;
+  --sc-font: Quicksand;
+  --mono-font: 'DM Mono';
+  --background: #f2f2f2;
+  --background-transparent: #f2f2f2cc;
+  --background-dark: #dfebf7;
+  --navbar: var(--background-transparent);
+  --chat-ai: #eaeaea;
+  --chat: #0f766e;
+  --dark: #fffcdf;
+  --dark-translucent: rgba(255, 252, 223, 0.9);
+  --dark-transparent: rgba(255, 252, 223, 0);
+  --fade-gradient: linear-gradient(
+    180deg,
+    var(--navbar) 0%,
+    var(--dark-transparent) 100%
+  );
+  --theme-translucent: rgba(255, 255, 255, 0.8);
+  --text: #111; /* Generic text color */
+  --primary: #28766e;  /* Actions (button background) */
+  --on-primary: #fff;  /* Button text, links */
+  --link: var(--primary);  /* Links, navbars */
+  --secondary: var(--text);
+  --border: var(--on-primary);
+  --white: #fff;
+  --black: #000;
+  --red: #ef0000;
+  --error: #ef0000;
+  --muted: #ccc;
+}

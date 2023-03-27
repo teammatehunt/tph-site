@@ -5,6 +5,16 @@
     storage file_system {
         root /srv
     }
+    servers {
+        metrics
+    }
+    http_port 8080
+    https_port 8081
+}
+
+# FIXME: update if you want to use basicauth : try `caddy hash-password`
+(basicauth_metrics) {
+    # admin FIXMEpassword
 }
 
 # snippet to serve files after checking auth
@@ -12,8 +22,13 @@
     # matchers are defined prior to snippet
 
     route {
+        metrics /caddy_metrics
+
         # `route` prevents Caddy from reordering the directives under it
-        reverse_proxy @django localhost:8000
+        reverse_proxy @django localhost:8000 {
+            rewrite {vars.basepath}{path}
+            header_up X-TPH-SITE {vars.site}
+        }
 
         # other files come from the client's public directory
         handle @nextstatic {
@@ -23,12 +38,15 @@
         }
 
         # proxy everything else to the frontend on port 3000
-        reverse_proxy localhost:3000
+        reverse_proxy localhost:{vars.frontend_port} {
+            rewrite {vars.basepath}{path}
+            header_up X-TPH-SITE {vars.site}
+        }
     }
 }
 
-# development server configuration
-{$SERVER_HOSTNAME} {
+# development server global settings
+(global_toplevel) {
     log {
         output file /srv/logs/caddy.log
     }
@@ -37,61 +55,125 @@
 
     # matchers
 
+    # these endpoints are targets for prometheus and are protected by basicauth
+    @metrics {
+        path /metrics           # django metrics
+        path /caddy_metrics     # caddy metrics
+    }
+
     @static_root {
         # static files at root
         path /banner.png
         path /favicon.ico
+        path /mh2023_activity_log.csv
         path /logo.png
         path /sorttable.js
         path /worker.js
         path /pyodide/*
     }
 
-    # things to be sent to Django that may need to be gated by @needs_check
-    @django {
-        path /api/*
-        path /media/*
-        path /ws/*  # FIXME: remove if websockets unused
-        path /clipboard
-    }
-
     @nextstatic {
         path /static/*
     }
 
+    # things to be sent to Django that may need to be gated by @needs_check
+    @django {
+        # not (not A and not B and not C) is equivalent to A or B or C
+        not {
+            # django paths for all sites
+            not {
+                path /authorize
+                path /clipboard
+            }
+            # django paths for registration only
+            not {
+                vars {vars.site_type} registration
+                # allowlist for registration site api paths
+                # NB: keep in sync with Caddyfile.prod
+                path /api/hunt_info
+                path /api/login
+                path /api/logout
+                path /api/register
+                path /api/register/*
+                path /api/register_individual
+                path /api/request_reset
+                path /api/reset_password
+                path /api/unsubscribe
+                path /api/validate_token
+            }
+            # django paths for hunt site only
+            not {
+                vars {vars.site_type} hunt
+                # main site apis and websockets are authenticated on the backend
+                path /api/*
+                path /ws/*
+            }
+        }
+    }
 
-    # puzzle pages and assets need to be inspected for access
-    @needs_check {
-        not path * # don't block anything in dev
+    # Unlike prod, don't bother treating media/ and uploads/ differently.
+    @media_assets {
+        path /media/*
+        path /uploads/*
     }
 
     # things to be sent to Django that don't need to be gated by @needs_check
     @django_admin {
         path /admin
         path /admin/*
+        path /huntinfo/*
         path /impersonate/*
         path /internal
         path /internal/*
-        path /huntinfo/*
+        path /metrics
+        path /spoilr
+        path /spoilr/*
     }
+
+    @needs_check {
+        # keep in sync with Caddyfile.prod
+        path /login
+        path /puzzles
+        path /puzzles/*
+        path /hints/*
+        path /solutions/*
+        path /internal_frontend/*
+        path /victory
+        path /rounds/*
+    }
+
     @django_static {
         # django-admin's CSS files load additional CSS, so the referer will be a /static path
         path /static/*
     }
+}
 
+# development server routing
+(main_entrypoint_directives) {
     # `route` prevents Caddy from reordering the directives under it
     route {
         handle @static_root {
-            root app/server/puzzles/static_root
+            root app/server/puzzles/static_root/{vars.site_static}
             file_server
         }
 
-        reverse_proxy @django_admin     localhost:8000
-        reverse_proxy @django_static    localhost:8000
+        file_server @media_assets {
+            root /srv
+        }
+
+        reverse_proxy @django_admin localhost:8000 {
+            rewrite {vars.basepath}{path}
+            header_up X-TPH-SITE {vars.site}
+        }
+        reverse_proxy @django_static localhost:8000 {
+            rewrite {vars.basepath}{path}
+            header_up X-TPH-SITE {vars.site}
+        }
 
         route @needs_check {
-            rewrite * /check{path}
             reverse_proxy localhost:8000 {
+                rewrite {vars.basepath}/check{path}
+                header_up X-TPH-SITE {vars.site}
                 @accel header X-Accel-Redirect *
                 handle_response @accel {
                     rewrite * {http.reverse_proxy.header.X-Accel-Redirect}
@@ -100,6 +182,119 @@
             }
         }
 
+        # hide metrics behind basicauth
+        basicauth @metrics {
+            import basicauth_metrics
+        }
+
         import serve
     }
+}
+
+# snippet for the main reverse proxy
+(main_entrypoint) {
+    import global_toplevel
+    import main_entrypoint_directives
+}
+
+# serve all sites
+{$CADDY_HUNT_HOST:http://no-hunt} {
+    vars {
+        frontend_port 3000
+        site hunt
+        site_static hunt
+        site_type hunt
+    }
+    import main_entrypoint
+}
+{$CADDY_REGISTRATION_HOST:http://no-registration} {
+    vars {
+        frontend_port 3002
+        site registration
+        site_static registration
+        site_type registration
+    }
+    import main_entrypoint
+}
+# FIXME: update paths
+{$CADDY_POSTHUNT_HOST:http://no-posthunt} {
+    @posthunt_hunt {
+        path /2023/mypuzzlehunt.com
+        path /2023/mypuzzlehunt.com/*
+    }
+    @posthunt_registration {
+        path /2023/registration.mypuzzlehunt.com
+        path /2023/registration.mypuzzlehunt.com/*
+    }
+    @posthunt_hunt_clientnav {
+        path_regexp ^/2023/_next/data/[^/]*/interestingthings\.museum/
+    }
+    @posthunt_root {
+        path /2023
+        path /2023/*
+        not {
+            path /2023/mypuzzlehunt.com
+            path /2023/mypuzzlehunt.com/*
+            path /2023/mypuzzlehunt2.com
+            path /2023/mypuzzlehunt2.com/*
+            path /2023/registration.mypuzzlehunt.com
+            path /2023/registration.mypuzzlehunt.com/*
+        }
+        not path_regexp ^/2023/_next/data/[^/]*/mypuzzlehunt\.com/
+        not path_regexp ^/2023/_next/data/[^/]*/mypuzzlehunt2\.com/
+    }
+    vars @posthunt_hunt {
+        frontend_port 3000
+        site museum
+        site_static posthunt
+        site_type hunt
+        basepath /2023/mypuzzlehunt.com
+    }
+    vars @posthunt_registration {
+        frontend_port 3002
+        site registration
+        site_static registration
+        site_type registration
+        basepath /2023/registration.mypuzzlehunt.com
+    }
+    vars @posthunt_hunt_clientnav {
+        frontend_port 3000
+        site museum
+        site_static posthunt
+        site_type hunt
+        basepath /2023
+    }
+    vars @posthunt_root {
+        frontend_port 3000
+        site hunt
+        site_static posthunt
+        site_type hunt
+        basepath /2023
+    }
+
+    # combined posthunt needs special routing, so have to split main_entrypoint
+    import global_toplevel
+
+    # Placeholders don't work with uri strip_prefix for some reason.
+    handle @posthunt_hunt {
+        uri strip_prefix /2023/mypuzzlehunt.com
+        import main_entrypoint_directives
+    }
+    handle @posthunt_registration {
+        uri strip_prefix /2023/registration.mypuzzlehunt.com
+        import main_entrypoint_directives
+    }
+    handle @posthunt_hunt_clientnav {
+        uri strip_prefix /2023
+        import main_entrypoint_directives
+    }
+    handle @posthunt_root {
+        uri strip_prefix /2023
+        import main_entrypoint_directives
+    }
+    # redirect posthunt domain root to 2023 landing page
+    handle / {
+        redir * /2023
+    }
+    error 404
 }

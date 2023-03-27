@@ -6,11 +6,13 @@ import React, {
 } from 'react';
 import $ from 'jquery';
 
+import cx from 'classnames';
 import highlightMask from 'assets/public/highlight-mask.png';
 
 interface Props {
   shine?: string;
   offset?: [number, number];
+  interactable?: boolean;
 }
 
 const MASK_SIZE: number = 1000;
@@ -20,7 +22,7 @@ const MASK_SIZE: number = 1000;
  */
 const ShineImage: FunctionComponent<
   Props & ImgHTMLAttributes<HTMLImageElement>
-> = ({ shine, height, children, ...props }) => {
+> = ({ shine, interactable = true, children, ...props }) => {
   const iconEl = useRef<HTMLImageElement>(null);
   const shineEl = useRef<HTMLImageElement>(null);
 
@@ -42,15 +44,25 @@ const ShineImage: FunctionComponent<
     }
   }, []);
 
+  // Not sure if we need the wrapping div here. Will leave it for now.
   return (
-    <div className="container">
-      <div className="wrapper">
-        <img ref={iconEl} className="icon" height={height} {...props} />
+    <div className="w-full">
+      <div className="w-full relative">
+        <img
+          ref={iconEl}
+          className={cx('icon', {
+            interact: interactable,
+          })}
+          width="100%"
+          {...props}
+        />
         {shine && (
           <img
             ref={shineEl}
-            className="shine"
-            height={height}
+            className={cx('shine', {
+              interact: interactable,
+            })}
+            width="100%"
             {...props}
             src={shine}
             style={{
@@ -62,26 +74,12 @@ const ShineImage: FunctionComponent<
       {children}
 
       <style jsx>{`
-        .container {
-          height: 100%;
-        }
-
-        .wrapper {
-          position: relative;
-        }
-
-        .wrapper {
-          height: ${height}px;
-        }
-
         img {
-          position: absolute;
-          transform: translateX(-50%);
           transition: transform 0.2s ease;
         }
 
-        div:hover img {
-          transform: translateX(-50%) scale(1.05);
+        div:hover img.interact {
+          transform: scale(1.05);
         }
 
         .shine {

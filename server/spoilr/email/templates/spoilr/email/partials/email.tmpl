@@ -1,0 +1,62 @@
+{% load bleach_tags humanize %}
+
+<div class="email {{ type }}">
+  <div class="email-content">
+    <div class="details">
+      <h3><a id='{{ email.id }}' href='#{{ email.id }}'>{% if type == 'out' %}<em>(Sent)</em> {% endif %}{{ email.subject }}</a></h3>
+
+      {% if type == 'out' %}<div><em><strong>Handler (Discord)</strong>: {% if email.handler %}{{ email.handler.discord }}{% else %}Automated{% endif %}</em></div>{% endif %}
+      <div><strong>From</strong>: {{ email.from_address }} / <strong>To</strong>: {{ email.to_addresses | join:", " }}
+      {% if 'gmail' in request.COOKIES %}
+          <a class="gmail-search" href="https://mail.google.com/mail/u/{{ request.COOKIES.gmail }}/#search/Rfc822msgid%3A{{ email.message_id | urlencode }}" target="_blank">
+            <img src="https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico" style="height: 1em; width: 1em;">
+          </a>
+      {% endif %}
+      {% if email.has_attachments %}<span title="See original email for attachments"> 🔗</span>{% endif %}</div>
+      {% if email.team or email.interaction %}
+      <div>
+        {% if email.team %}<strong>Team</strong>: <a href="{% url 'spoilr.progress:team' email.team.username %}" target="_blank">{{ email.team.name }}</a>{% endif %}
+        {% if email.team or email.interaction %}<br>{% endif %}
+        {% if email.interaction %}<strong>Interaction</strong>: <a href="{% url 'spoilr.interaction:interaction' email.interaction.slug %}" target="_blank">{{ email.interaction.name }}</a>{% endif %}
+      </div>
+      {% endif %}
+
+      {% if not compact %}
+      <div>
+        {% if type == 'in' %}
+        <strong>Received</strong>: <span title="{{ email.received_datetime }}">{{ email.received_datetime|naturaltime }}</span>
+        {% else %}
+        <strong>Sent</strong>: <span title="{{ email.sent_datetime }}">{{ email.sent_datetime|naturaltime }}</span>
+        {% endif %}
+
+      </div>
+      {% endif %}
+    </div>
+
+    {% if not compact %}
+      <pre class="text">{{ email.text_content }}</pre>
+      {% if email.text_content == "" %}
+      <div class="html">{{ email.html_content|bleach }}</div>
+      {% else %}
+      <div class="html hidden" id="email-{{ email.id }}">{{ email.html_content|bleach }}</div>
+
+      <button class="show-html" data-id="{{ email.id }}">Show/hide HTML version</button>
+      {% endif %}
+
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.show-html {
+  font-size: 10px;
+}
+</style>
+<script>
+$(document).ready(function() {
+  $(".show-html").click(function() {
+    var id = $(this).data('id');
+    $("#email-" + id).toggle();
+  });
+});
+</script>

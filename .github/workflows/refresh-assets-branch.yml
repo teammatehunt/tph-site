@@ -1,0 +1,12 @@
+name: refresh-assets-branch
+
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh-assets-branch:
+    uses: ./.github/workflows/refresh-assets.yml
+    with:
+      DEPLOY_USER: branch
+      DEPLOY_HOST: branch.teammatehunt.com
+    secrets: inherit

@@ -3,7 +3,6 @@ import datetime
 import functools
 import glob
 import io
-import json
 import os
 import subprocess
 import tempfile
@@ -12,107 +11,102 @@ from collections import Counter, OrderedDict, defaultdict
 from pathlib import Path
 
 from django.conf import settings
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import escape
 from django.views.decorators.http import require_GET, require_POST
-from importlib_resources import files
-from tph.utils import DEFAULT_USERNAME, staticfiles_storage
+from spoilr.core.api.hunt import (
+    get_site_close_time,
+    get_site_end_time,
+    get_site_launch_time,
+    is_site_launched,
+)
+from spoilr.email.models import Email
+from spoilr.email.utils import get_all_emails
+from spoilr.hints.models import Hint
+from spoilr.registration.models import TeamRegistrationInfo
+from spoilr.utils import generate_url, json
+from tph.utils import load_file, staticfiles_storage
 
+from puzzles.assets import get_hashed_url
 from puzzles.emailing import Batch, email_obj_for_batch
 from puzzles.forms import CustomEmailForm, HiddenCustomEmailForm
-from puzzles.hunt_config import (
-    HUNT_CLOSE_TIME,
-    HUNT_END_TIME,
-    HUNT_START_TIME,
-    INTRO_META_SLUGS,
-    META_META_SLUG,
-)
-from puzzles.messaging import send_mail_wrapper, send_mass_mail_implementation
+from puzzles.hunt_config import DONE_SLUG
+from puzzles.messaging import send_mass_mail_implementation
 from puzzles.models import (
-    AnswerSubmission,
     CustomPuzzleSubmission,
-    Dimension,
-    Email,
-    EmailTemplate,
-    Errata,
-    Hint,
     Puzzle,
-    PuzzleUnlock,
-    Round,
+    PuzzleAccess,
+    PuzzleSubmission,
     Team,
-    TeamMember,
 )
+from puzzles.rounds.utils import rounds_by_act
 from puzzles.shortcuts import dispatch_shortcut
-from puzzles.utils import get_all_emails
 from puzzles.views.auth import restrict_access, validate_puzzle
 
-ERRATA_EMAIL_TEMPLATE = "errata_email"
+
+def get_navbar_rounds(request, team):
+    """Returns which rounds to display in the navbar, grouped by act."""
+    visible_acts = rounds_by_act(team.unlocked_rounds())
+
+    return [
+        [
+            {
+                "act": puzzle_round.act,
+                "slug": puzzle_round.slug,
+                "name": puzzle_round.name,
+                "url": puzzle_round.url,
+            }
+            for puzzle_round in act
+        ]
+        for act in visible_acts
+    ]
 
 
 @require_GET
 def get_hunt_info(request):
     def get_team_info_for_header():
-        if request.user.is_authenticated and request.user.username != DEFAULT_USERNAME:
+        if request.user.is_authenticated:
             team_info = None
-            if request.context.team:
+            team = request.context.team
+            if team:
                 team_info = {
-                    "name": request.context.team.team_name,
-                    "slug": request.context.team.slug,
-                    "solves": len(request.context.team.solves),
-                    "members": request.context.team.get_members(with_emails=True),
+                    "name": team.name,
+                    "slug": team.slug,
+                    "rounds": get_navbar_rounds(request, team),
                 }
-                if request.context.is_hunt_complete:
-                    team_info["stage"] = "finished"
-                elif request.context.team.has_unlocked_final_meta(request.context):
-                    team_info["stage"] = "meta"
-                elif request.context.team.has_unlocked_main_round(request.context):
-                    team_info["stage"] = "main"
+                # Serialize the team's hunt story progress.
+                story_state = request.context.story_state
+                team_info["state"] = story_state.value
+
             team_info = {
                 "teamInfo": team_info,
-                "superuser": request.context.is_superuser,
-                "isImpersonate": hasattr(request.user, "is_impersonate")
-                and request.user.is_impersonate,
             }
-            team_info["errata"] = request.context.errata
+            if request.context.is_superuser:
+                team_info["superuser"] = True
+            elif team.is_public:
+                team_info["public"] = True
+            if hasattr(request.user, "is_impersonate") and request.user.is_impersonate:
+                team_info["isImpersonate"] = True
+
             return team_info
 
         return None
-
-    storyUnlocks = []
-
-    for story in request.context.unlocks["story"]:
-        puzzle = story.puzzle
-        if not request.context.hunt_has_started:
-            if puzzle and puzzle.slug:
-                continue
-        story_data = {
-            "slug": story.slug,
-            "text": story.text,
-            "puzzleSlug": puzzle.slug if puzzle else None,
-            # meta cards should show in modal
-            "modal": not puzzle or puzzle.is_meta,
-            "deep": story.deep,
-        }
-        image_url = story.get_image_url(Dimension.INTRO)
-        if image_url:
-            story_data["storyUrl"] = image_url
-        team = request.context.team
-        storyUnlocks.append(story_data)
 
     hunt_info = {
         "startTime": request.context.start_time,
         "secondsToStartTime": max(
             0, (request.context.start_time - timezone.now()).total_seconds()
         ),
-        "endTime": request.context.end_time,
-        "closeTime": request.context.close_time,
+        "endTime": get_site_end_time(),
+        "closeTime": get_site_close_time(),
         "hintReleaseTime": request.context.hint_time,
-        "storyUnlocks": storyUnlocks,
     }
+    if request.context.site:
+        hunt_info["site"] = request.context.site
 
     return JsonResponse(
         {
@@ -120,6 +114,15 @@ def get_hunt_info(request):
             "userInfo": get_team_info_for_header(),
         }
     )
+
+
+@require_GET
+def get_hunt_site(request):
+    # For use in the registration page to redirect to the registration homepage until start time
+    if not is_site_launched():
+        return JsonResponse({"huntSite": "/"})
+    else:
+        return JsonResponse({"huntSite": generate_url("hunt", "/")})
 
 
 def sort_puzzle(puzzle):
@@ -131,7 +134,10 @@ def sort_puzzle(puzzle):
 @restrict_access(after_hunt_end=True)
 def hunt_stats(request):
     total_teams = Team.objects.exclude(is_hidden=True).count()
-    total_participants = TeamMember.objects.exclude(team__is_hidden=True).count()
+    # NB: this may not be entirely accurate if some teams didn't fill out this field.
+    total_participants = TeamRegistrationInfo.objects.aggregate(Sum("tm_total"))[
+        "tm_total__sum"
+    ]
 
     def is_forward_solve(puzzle, team_id):
         return puzzle.is_meta or all(
@@ -147,7 +153,7 @@ def hunt_stats(request):
     # response requesting more information still uses the hint because teams
     # can reply to the thread.
     for hint in Hint.objects.filter(
-        team__is_hidden=False,
+        team__team__is_hidden=False,
         root_ancestor_request__isnull=True,
         is_request=True,
     ).exclude(
@@ -165,22 +171,20 @@ def hunt_stats(request):
     solves_by_puzzle = defaultdict(int)
     guess_teams = defaultdict(set)
     solve_teams = defaultdict(set)
-    solve_times = defaultdict(lambda: HUNT_CLOSE_TIME)
-    for submission in AnswerSubmission.objects.filter(
+    solve_times = defaultdict(lambda: get_site_close_time())
+    for submission in PuzzleSubmission.objects.filter(
         used_free_answer=False,
-        team__is_hidden=False,
-        submitted_datetime__lt=HUNT_END_TIME,
+        team__team__is_hidden=False,
+        timestamp__lt=get_site_end_time(),
     ):
         total_guesses += 1
         guesses_by_puzzle[submission.puzzle_id] += 1
         guess_teams[submission.puzzle_id].add(submission.team_id)
-        if submission.is_correct:
+        if submission.correct:
             total_solves += 1
             solves_by_puzzle[submission.puzzle_id] += 1
             solve_teams[submission.puzzle_id].add(submission.team_id)
-            solve_times[
-                submission.puzzle_id, submission.team_id
-            ] = submission.submitted_datetime
+            solve_times[submission.puzzle_id, submission.team_id] = submission.timestamp
 
     data = []
     for puzzle in sorted(request.context.all_puzzles, key=sort_puzzle):
@@ -252,37 +256,38 @@ def hunt_stats(request):
 
 
 def get_puzzle_stats(puzzle, team):
-    q = Q(team__is_hidden=False)
+    q = Q(team__team__is_hidden=False)
     if team:
         q |= Q(team__id=team.id)
     puzzle_submissions = (
-        puzzle.answersubmission_set.filter(
-            q, used_free_answer=False, submitted_datetime__lt=HUNT_END_TIME
-        )
-        .order_by("submitted_datetime")
-        .select_related("team")
+        puzzle.puzzlesubmission_set.filter(q, timestamp__lt=get_site_end_time())
+        .order_by("timestamp")
+        .select_related("team", "puzzlesubmission")
     )
 
     solve_time_map = {}
     total_guesses_map = defaultdict(int)
     solvers_map = {}
+    free_answer_map = defaultdict(lambda: False)
+    free_solves = 0
     unlock_time_map = {
-        unlock.team_id: unlock.unlock_datetime
-        for unlock in puzzle.puzzleunlock_set.all()
+        unlock.team_id: unlock.timestamp for unlock in puzzle.puzzleaccess_set.all()
     }
     incorrect_guesses = Counter()
     guess_time_map = {}
     for submission in puzzle_submissions:
         team_id = submission.team_id
         total_guesses_map[team_id] += 1
-        if submission.is_correct:
-            solve_time_map[team_id] = submission.submitted_datetime
+        if submission.correct:
+            solve_time_map[team_id] = submission.timestamp
             solvers_map[team_id] = submission.team
+            if submission.puzzlesubmission.used_free_answer:
+                free_answer_map[team_id] = True
+                total_guesses_map[team_id] -= 1
+                free_solves += 1
         else:
-            incorrect_guesses[submission.submitted_answer] += 1
-            guess_time_map[
-                team_id, submission.submitted_answer
-            ] = submission.submitted_datetime
+            incorrect_guesses[submission.answer] += 1
+            guess_time_map[team_id, submission.answer] = submission.timestamp
     wrong = "(?)"
     if incorrect_guesses:
         ((wrong, _),) = incorrect_guesses.most_common(1)
@@ -302,7 +307,8 @@ def get_puzzle_stats(puzzle, team):
             ).total_seconds()
             if solver.id in unlock_time_map
             else None,
-            "total_guesses": total_guesses_map[solver.id] - 1,
+            "total_guesses": max(total_guesses_map[solver.id] - 1, 0),
+            "used_free_answer": free_answer_map[solver.id],
         }
         for solver in solvers_map.values()
     ]
@@ -310,6 +316,7 @@ def get_puzzle_stats(puzzle, team):
     return {
         "solvers": solvers,
         "solves": len(solvers_map),
+        "free_solves": free_solves,
         "guesses": sum(total_guesses_map.values()),
         "answers_tried": incorrect_guesses.most_common(),
         "wrong": wrong,
@@ -332,7 +339,7 @@ def histogram(request, slug):
     response = HttpResponse(content_type="text/csv")
     response[
         "Content-Disposition"
-    ] = f'attachment; filename="hunt_{slug}_histogram.csv"'
+    ] = f'attachment; filename="teammate_hunt_{slug}_histogram.csv"'
     fieldnames = ["submission", "counts"]
     writer = csv.DictWriter(response, fieldnames=fieldnames)
     writer.writeheader()
@@ -349,7 +356,7 @@ def histogram_by_team(request, slug):
     # team is the PK, replace with team name
     pk_to_teamname = {}
     for team in Team.objects.all():
-        pk_to_teamname[team.pk] = team.team_name
+        pk_to_teamname[team.pk] = team.name
     rows = []
     for row in data:
         rows.append(row)
@@ -357,7 +364,7 @@ def histogram_by_team(request, slug):
     response = HttpResponse(content_type="text/csv")
     response[
         "Content-Disposition"
-    ] = f'attachment; filename="hunt_{slug}_histogram_by_team.csv"'
+    ] = f'attachment; filename="teammate_hunt_{slug}_histogram_by_team.csv"'
     fieldnames = ["submission", "team", "counts"]
     writer = csv.DictWriter(response, fieldnames=fieldnames)
     writer.writeheader()
@@ -371,25 +378,25 @@ def histogram_by_team(request, slug):
 def custom_puzzle_csv(request, slug):
     puzzle = Puzzle.objects.get(slug=slug)
     submissions = CustomPuzzleSubmission.objects.filter(
-        puzzle=puzzle, submitted_datetime__lt=HUNT_END_TIME
+        puzzle=puzzle, timestamp__lt=get_site_end_time()
     ).select_related()
     rows = []
     for guess in submissions:
         rows.append(
             {
-                "team": guess.team.team_name,
-                "subpuzzle": guess.subpuzzle,
+                "team": guess.team.name,
+                "minipuzzle": guess.minipuzzle,
                 "submission": guess.submission,
                 "count": guess.count,
-                "first_submit": guess.submitted_datetime,
-                "correct": guess.is_correct,
+                "first_submit": guess.timestamp,
+                "correct": guess.correct,
             }
         )
     rows.sort(key=lambda d: d["first_submit"])
     response = HttpResponse(content_type="text/csv")
     response[
         "Content-Disposition"
-    ] = f'attachment; filename="hunt_{slug}_submissions.csv"'
+    ] = f'attachment; filename="teammate_hunt_{slug}_submissions.csv"'
     fieldnames = ["team", "subpuzzle", "submission", "count", "first_submit", "correct"]
     writer = csv.DictWriter(response, fieldnames=fieldnames)
     writer.writeheader()
@@ -401,18 +408,15 @@ def custom_puzzle_csv(request, slug):
 @require_GET
 @restrict_access()
 def activity_csv(request):
+    END_TIME = get_site_end_time()
     answers = (
-        AnswerSubmission.objects.filter(
-            submitted_datetime__lt=HUNT_END_TIME, team__is_hidden=False
-        )
-        .order_by("submitted_datetime")
+        PuzzleSubmission.objects.filter(timestamp__lt=END_TIME, team__is_hidden=False)
+        .order_by("timestamp")
         .select_related()
     )
     unlocks = (
-        PuzzleUnlock.objects.filter(
-            unlock_datetime__lt=HUNT_END_TIME, team__is_hidden=False
-        )
-        .order_by("unlock_datetime")
+        PuzzleAccess.objects.filter(timestamp__lt=END_TIME, team__team__is_hidden=False)
+        .order_by("timestamp")
         .select_related()
     )
 
@@ -423,21 +427,21 @@ def activity_csv(request):
         out = []
         out.append(
             [
-                guess.team.team_name,
+                guess.team.name,
                 "guess",
                 guess.puzzle.name,
-                guess.submitted_datetime.strftime(date_pattern),
-                guess.submitted_answer,
-                guess.is_correct,
+                guess.timestamp.strftime(date_pattern),
+                guess.answer,
+                guess.correct,
             ]
         )
-        if guess.is_correct:
+        if guess.correct:
             out.append(
                 [
-                    guess.team.team_name,
+                    guess.team.name,
                     "solve",
                     guess.puzzle.name,
-                    guess.submitted_datetime.strftime(date_pattern),
+                    guess.timestamp.strftime(date_pattern),
                     "",
                     "",
                 ]
@@ -445,10 +449,10 @@ def activity_csv(request):
         return out
 
     def process_unlock(unlock):
-        unlock_time = max(unlock.unlock_datetime, HUNT_START_TIME)
+        unlock_time = max(unlock.timestamp, get_site_launch_time())
         return [
             [
-                unlock.team.team_name,
+                unlock.team.name,
                 "unlock",
                 unlock.puzzle.name,
                 unlock_time.strftime(date_pattern),
@@ -462,7 +466,7 @@ def activity_csv(request):
     j = 0
     while i < len(answers) and j < len(unlocks):
         # gueses and solve events before unlocks if there's a tie
-        if answers[i].submitted_datetime <= unlocks[j].unlock_datetime:
+        if answers[i].timestamp <= unlocks[j].timestamp:
             rows.extend(process_guess(answers[i]))
             i += 1
         else:
@@ -476,7 +480,9 @@ def activity_csv(request):
         j += 1
 
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="hunt_submit_log.csv"'
+    response[
+        "Content-Disposition"
+    ] = 'attachment; filename="teammate_hunt_submit_log.csv"'
     writer = csv.writer(response)
     writer.writerow(csv_header)
     for row in rows:
@@ -488,11 +494,14 @@ def activity_csv(request):
 @restrict_access(after_hunt_end=True)
 def public_activity_csv(request):
     # Downloads a static version of the CSV generated earlier.
-    current_dir = files(".".join(__name__.split(".")[:-1]))
-    with current_dir.joinpath("hunt_submit_log.csv").open() as f:
+    with load_file(
+        "views/teammate_hunt_submit_log.csv", base_module="puzzles"
+    ).open() as f:
         content = f.read()
         response = HttpResponse(content, content_type="text/csv")
-        response["Content-Disposition"] = 'attachment; filename="hunt_submit_log.csv"'
+        response[
+            "Content-Disposition"
+        ] = 'attachment; filename="teammate_hunt_submit_log.csv"'
         return response
 
 
@@ -505,7 +514,7 @@ def stats_public(request):
     solvers = []
     for solver in stats_dict["solvers"]:
         team = solver["team"]
-        solver["team"] = team.team_name
+        solver["team"] = team.name
         solver["slug"] = team.slug
         solvers.append(solver)
     stats_dict["solvers"] = solvers
@@ -516,50 +525,54 @@ def stats_public(request):
     # Manually populate puzzle data that's normally already in the Django call.
     stats_dict["puzzle_name"] = request.context.puzzle.name
     stats_dict["puzzle_answer"] = request.context.puzzle.normalized_answer
+    stats_dict["puzzle_url"] = request.context.puzzle.url
     return JsonResponse(stats_dict)
 
 
 @require_GET
 @restrict_access(after_hunt_end=True)
 def finishers(request):
+    END_TIME = get_site_end_time()
     teams = OrderedDict()
     solves_by_team = defaultdict(list)
     metas_by_team = defaultdict(list)
-    unlock_times = defaultdict(lambda: HUNT_END_TIME)
+    unlock_times = defaultdict(lambda: END_TIME)
     wrong_times = {}
 
-    for submission in AnswerSubmission.objects.filter(
-        puzzle__slug=META_META_SLUG,
+    for submission in PuzzleSubmission.objects.filter(
+        puzzle___slug=DONE_SLUG,
         team__is_hidden=False,
-        submitted_datetime__lt=HUNT_END_TIME,
-    ).order_by("submitted_datetime"):
-        if submission.is_correct:
+        timestamp__lt=END_TIME,
+    ).order_by("timestamp"):
+        if submission.correct:
             teams[submission.team_id] = None
         else:
-            wrong_times[submission.team_id] = submission.submitted_datetime
-    for unlock in PuzzleUnlock.objects.filter(
-        team__id__in=teams, puzzle__slug=META_META_SLUG
+            wrong_times[submission.team_id] = submission.timestamp
+    for unlock in PuzzleAccess.objects.filter(
+        team__id__in=teams, puzzle___slug=DONE_SLUG
     ):
-        unlock_times[unlock.team_id] = unlock.unlock_datetime
-    for solve in AnswerSubmission.objects.select_related().filter(
+        unlock_times[unlock.team_id] = unlock.timestamp
+    for solve in PuzzleSubmission.objects.select_related().filter(
         team__id__in=teams,
         used_free_answer=False,
-        is_correct=True,
-        submitted_datetime__lt=HUNT_END_TIME,
+        correct=True,
+        timestamp__lt=END_TIME,
     ):
-        solves_by_team[solve.team_id].append(solve.submitted_datetime)
+        solves_by_team[solve.team_id].append(solve.timestamp)
         if solve.puzzle.is_meta:
-            metas_by_team[solve.team_id].append(solve.submitted_datetime)
-        if solve.puzzle.slug == META_META_SLUG:
+            metas_by_team[solve.team_id].append(solve.timestamp)
+        if solve.puzzle.slug == DONE_SLUG:
             teams[solve.team_id] = (solve.team, unlock_times[solve.team_id])
 
     data = []
+    START_TIME = get_site_launch_time()
+    START_TIME = get_site_end_time()
     for team_id, (team, unlock) in teams.items():
-        solves = [HUNT_START_TIME] + solves_by_team[team_id] + [HUNT_END_TIME]
+        solves = [START_TIME] + solves_by_team[team_id] + [END_TIME]
         solves = [
             {
-                "before": (solves[i - 1] - HUNT_START_TIME).total_seconds(),
-                "after": (solves[i] - HUNT_START_TIME).total_seconds(),
+                "before": (solves[i - 1] - START_TIME).total_seconds(),
+                "after": (solves[i] - START_TIME).total_seconds(),
             }
             for i in range(1, len(solves))
         ]
@@ -573,201 +586,14 @@ def finishers(request):
                 "wrong_duration": (metas[-1] - wrong_times[team_id]).total_seconds()
                 if team_id in wrong_times
                 else None,
-                "hunt_length": (HUNT_END_TIME - HUNT_START_TIME).total_seconds(),
+                "hunt_length": (END_TIME - START_TIME).total_seconds(),
                 "solves": solves,
-                "metas": [(ts - HUNT_START_TIME).total_seconds() for ts in metas],
+                "metas": [(ts - START_TIME).total_seconds() for ts in metas],
             }
         )
     if request.context.is_superuser:
         data.reverse()
     return render(request, "finishers.html", {"data": data})
-
-
-@require_GET
-@restrict_access(after_hunt_end=True)
-def bigboard(request):
-    puzzles = sorted(request.context.all_puzzles, key=sort_puzzle)
-    puzzle_map = {}
-    puzzle_metas = defaultdict(set)
-    intro_meta_ids = set()
-    meta_meta_id = None
-    for puzzle in puzzles:
-        puzzle_map[puzzle.id] = puzzle
-        if puzzle.slug in INTRO_META_SLUGS:
-            intro_meta_ids.add(puzzle.id)
-        if puzzle.slug == META_META_SLUG:
-            meta_meta_id = puzzle.id
-        if not puzzle.is_meta:
-            for meta in puzzle.metas.all():
-                puzzle_metas[puzzle.id].add(meta.id)
-
-    wrong_guesses_map = defaultdict(int)  # key (team, puzzle)
-    wrong_guesses_by_team_map = defaultdict(int)  # key team
-    solve_position_map = (
-        dict()
-    )  # key (team, puzzle); value n if team is nth to solve this puzzle
-    solve_count_map = defaultdict(int)  # puzzle -> number of counts
-    total_guess_map = defaultdict(int)  # puzzle -> number of guesses
-    used_hints_map = defaultdict(int)  # (team, puzzle) -> number of hints
-    used_hints_by_team_map = defaultdict(int)  # team -> number of hints
-    used_hints_by_puzzle_map = defaultdict(int)  # puzzle -> number of hints
-    solves_map = defaultdict(dict)  # team -> {puzzle id -> puzzle}
-    intro_solves_map = defaultdict(int)  # team -> number of puzzle solves
-    main_solves_map = defaultdict(int)  # team -> number of puzzle solves
-    meta_solves_map = defaultdict(int)  # team -> number of meta solves
-    solve_time_map = defaultdict(dict)  # team -> {puzzle id -> solve time}
-    during_hunt_solve_time_map = defaultdict(dict)  # team -> {puzzle id -> solve time}
-    free_answer_map = defaultdict(set)  # team -> {puzzle id}
-    free_answer_by_puzzle_map = defaultdict(int)  # puzzle -> number of free answers
-
-    for team_id, puzzle_id, used_free_answer, submitted_datetime in (
-        AnswerSubmission.objects.filter(team__is_hidden=False, is_correct=True)
-        .order_by("submitted_datetime")
-        .values_list("team_id", "puzzle_id", "used_free_answer", "submitted_datetime")
-    ):
-        total_guess_map[puzzle_id] += 1
-        if used_free_answer:
-            free_answer_map[team_id].add(puzzle_id)
-            free_answer_by_puzzle_map[puzzle_id] += 1
-        else:
-            solve_count_map[puzzle_id] += 1
-            solve_position_map[(team_id, puzzle_id)] = solve_count_map[puzzle_id]
-            solve_time_map[team_id][puzzle_id] = submitted_datetime
-            if submitted_datetime < HUNT_END_TIME:
-                during_hunt_solve_time_map[team_id][puzzle_id] = submitted_datetime
-        solves_map[team_id][puzzle_id] = puzzle_map[puzzle_id]
-        if puzzle_id not in puzzle_metas:
-            meta_solves_map[team_id] += 1
-        elif len(intro_meta_ids & puzzle_metas[puzzle_id]) >= 1:
-            intro_solves_map[team_id] += 1
-        else:
-            main_solves_map[team_id] += 1
-
-    for aggregate in (
-        AnswerSubmission.objects.filter(team__is_hidden=False, is_correct=False)
-        .values("team_id", "puzzle_id")
-        .annotate(count=Count("*"))
-    ):
-        team_id = aggregate["team_id"]
-        puzzle_id = aggregate["puzzle_id"]
-        total_guess_map[puzzle_id] += aggregate["count"]
-        wrong_guesses_map[(team_id, puzzle_id)] += aggregate["count"]
-        wrong_guesses_by_team_map[team_id] += aggregate["count"]
-
-    for aggregate in (
-        Hint.objects.filter(
-            is_request=True,
-            root_ancestor_request__isnull=True,
-            status=Hint.ANSWERED,
-        )
-        .values("team_id", "puzzle_id")
-        .annotate(count=Count("*"))
-    ):
-        team_id = aggregate["team_id"]
-        puzzle_id = aggregate["puzzle_id"]
-        used_hints_map[(team_id, puzzle_id)] += aggregate["count"]
-        used_hints_by_team_map[team_id] += aggregate["count"]
-        used_hints_by_puzzle_map[puzzle_id] += aggregate["count"]
-
-    # Reproduce Team.leaderboard behavior for ignoring solves after hunt end,
-    # but not _teams_ created after hunt end. They'll just all be at the bottom.
-    leaderboard = sorted(
-        Team.objects.filter(is_hidden=False),
-        key=lambda team: (
-            during_hunt_solve_time_map[team.id].get(meta_meta_id, HUNT_END_TIME),
-            -len(during_hunt_solve_time_map[team.id]),
-            team.last_solve_time or team.creation_time,
-        ),
-    )
-    limit = request.META.get("QUERY_STRING", "")
-    limit = int(limit) if limit.isdigit() else 0
-    if limit:
-        leaderboard = leaderboard[:limit]
-    unlocks = set(PuzzleUnlock.objects.values_list("team_id", "puzzle_id"))
-    unlock_count_map = defaultdict(int)
-
-    def classes_of(team_id, puzzle_id):
-        unlocked = (team_id, puzzle_id) in unlocks
-        if unlocked:
-            unlock_count_map[puzzle_id] += 1
-        solve_time = solve_time_map[team_id].get(puzzle_id)
-        if puzzle_id in free_answer_map[team_id]:
-            yield "F"  # free answer
-        elif solve_time:
-            yield "S"  # solved
-        elif wrong_guesses_map.get((team_id, puzzle_id)):
-            yield "W"  # wrong
-        elif unlocked:
-            yield "U"  # unlocked
-        if used_hints_map.get((team_id, puzzle_id)):
-            yield "H"  # hinted
-        if solve_time and solve_time > HUNT_END_TIME:
-            yield "P"  # post-hunt solve
-        if solve_time and puzzle_metas.get(puzzle_id):
-            metas_before = 0
-            metas_after = 0
-            for meta_id in puzzle_metas[puzzle_id]:
-                meta_time = solve_time_map[team_id].get(meta_id)
-                if meta_time and solve_time > meta_time - datetime.timedelta(minutes=5):
-                    metas_before += 1
-                else:
-                    metas_after += 1
-            if metas_after == 0:
-                yield "B"  # backsolved from all metas
-            elif metas_before != 0:
-                yield "b"  # backsolved from some metas
-
-    board = []
-    for team in leaderboard:
-        team.solves = solves_map[team.id]
-        board.append(
-            {
-                "team": team,
-                "last_solve_time": max(
-                    [team.creation_time, *solve_time_map[team.id].values()]
-                ),
-                "total_solves": len(solve_time_map[team.id]),
-                "free_solves": len(free_answer_map[team.id]),
-                "wrong_guesses": wrong_guesses_by_team_map[team.id],
-                "used_hints": used_hints_by_team_map[team.id],
-                "total_hints": team.num_hints_total,
-                "finished": solve_position_map.get((team.id, meta_meta_id)),
-                # "deep": team.display_deep,
-                "intro_solves": intro_solves_map[team.id],
-                "main_solves": main_solves_map[team.id],
-                "meta_solves": meta_solves_map[team.id],
-                "entries": [
-                    {
-                        "wrong_guesses": wrong_guesses_map[(team.id, puzzle.id)],
-                        "solve_position": solve_position_map.get((team.id, puzzle.id)),
-                        "hints": used_hints_map[(team.id, puzzle.id)],
-                        "cls": " ".join(classes_of(team.id, puzzle.id)),
-                    }
-                    for puzzle in puzzles
-                ],
-            }
-        )
-
-    annotated_puzzles = [
-        {
-            "puzzle": puzzle,
-            "solves": solve_count_map[puzzle.id],
-            "free_solves": free_answer_by_puzzle_map[puzzle.id],
-            "total_guesses": total_guess_map[puzzle.id],
-            "total_unlocks": unlock_count_map[puzzle.id],
-            "hints": used_hints_by_puzzle_map[puzzle.id],
-        }
-        for puzzle in puzzles
-    ]
-
-    return render(
-        request,
-        "bigboard.html",
-        {
-            "board": board,
-            "puzzles": annotated_puzzles,
-        },
-    )
 
 
 @require_POST
@@ -810,7 +636,7 @@ def approve_profile_pic(request, user_name):
         request,
         "approve_picture.html",
         {
-            "team_name": team.team_name,
+            "name": team.name,
             "picture": profile_pic,
             "approved": team.profile_pic_approved,
         },
@@ -829,7 +655,7 @@ def internal_advance_team(request, user_name):
     SOLVES = {
         "hunt_start": [],
     }
-    # FIXME: populate SOLVES with correct puzzle slugs.
+    # FIXME(update): populate SOLVES with correct puzzle slugs.
     SOLVES["intro_meta_unlocked"] = SOLVES["hunt_start"] + []
     SOLVES["intro_meta_solved"] = SOLVES["intro_meta_unlocked"] + INTRO_META_SLUGS
 
@@ -841,17 +667,17 @@ def internal_advance_team(request, user_name):
         solves_to_set = SOLVES[setting]
         # We rely on our existing deep system to propagate unlocks, and only set
         # solves, but we still need to clear up any prior unlocks.
-        team.answersubmission_set.all().delete()
-        team.storycardunlock_set.all().delete()
-        team.puzzleunlock_set.all().delete()
+        team.puzzlesubmission_set.all().delete()
+        team.storycardaccess_set.all().delete()
+        team.puzzleaccess_set.all().delete()
         puzzles = Puzzle.objects.filter(slug__in=solves_to_set)
         for puzzle in puzzles:
-            PuzzleUnlock(team=team, puzzle=puzzle).save()
-            AnswerSubmission(
-                team=team,
-                puzzle=puzzle,
-                submitted_answer="fakeanswersetbyinternaltool",
-                is_correct=True,
+            PuzzleAccess(team=team.spoilr_team, puzzle=puzzle.spoilr_puzzle).save()
+            PuzzleSubmission(
+                team=team.spoilr_team,
+                puzzle=puzzle.spoilr_puzzle,
+                answer="fakeanswersetbyinternaltool",
+                correct=True,
                 used_free_answer=False,
             ).save()
 
@@ -859,43 +685,9 @@ def internal_advance_team(request, user_name):
         request,
         "team_progress_advance.html",
         {
-            "team_name": team.team_name,
+            "name": team.name,
             "setting": setting,
         },
-    )
-
-
-@require_GET
-@restrict_access()
-def internal_errata(request):
-    errata = Errata.objects.all().order_by("creation_time")
-    return render(request, "errata_list.html", {"errata": errata})
-
-
-@restrict_access()
-def emails_for_errata(request, errata_pk):
-    errata = Errata.objects.get(pk=errata_pk)
-    puzzle = errata.puzzle
-    team_and_emails = get_all_emails(unlocked_puzzle=puzzle)
-    if request.method == "POST":
-        # We're sending the emails.
-        # Send 1 email per team.
-        for team, emails in team_and_emails:
-            send_mail_wrapper(
-                f"Erratum issued for {puzzle.name}",
-                ERRATA_EMAIL_TEMPLATE,
-                {"errata": errata},
-                emails,
-            )
-        # Redirect to a confirmation page (avoid double-sends if page refreshed.)
-        return redirect("errata-email-confirm")
-        # Redirect to confirmation page.
-    email_template = ERRATA_EMAIL_TEMPLATE + ".html"
-    email_string = render_to_string(email_template, context={"errata": errata})
-    return render(
-        request,
-        "email_list.html",
-        {"emails": team_and_emails, "email_string": email_string, "errata": errata},
     )
 
 
@@ -919,36 +711,6 @@ def all_emails(request):
 
 
 @require_GET
-@restrict_access(after_hunt_end=True)
-def all_pictures(request):
-    teams = Team.leaderboard(request.context.team)
-    has_pics = [team for team in teams if team["has_pic"]]
-    # TODO something less awful to get sorted team objects instead of sorted json
-    # don't want to touch leaderboard since it retrieves content shown to client.
-    team_objs = Team.objects.filter(user_id__in=[team["user_id"] for team in has_pics])
-    order = dict((team["user_id"], i) for i, team in enumerate(has_pics))
-    sorted_teams = [None] * len(has_pics)
-    for team in team_objs:
-        sorted_teams[order[team.user_id]] = team
-
-    profile_pics = []
-    victory_pics = []
-    for team in sorted_teams:
-        profile_pics.append(os.path.join(settings.MEDIA_URL, team.profile_pic.name))
-        victory_pics.append(
-            ""
-            if not team.profile_pic_victory.name
-            else os.path.join(settings.MEDIA_URL, team.profile_pic_victory.name)
-        )
-
-    return render(
-        request,
-        "all_pictures.html",
-        {"teams_with_pics": zip(sorted_teams, profile_pics, victory_pics)},
-    )
-
-
-@require_GET
 @restrict_access()
 def email_main(request):
     return render(request, "email_main.html")
@@ -959,6 +721,7 @@ def handler404(request, exception):
     return redirect("/404")
 
 
+# This code is not used - was part of TPH email code, but going through spoilr now instead.
 @restrict_access()
 def custom_email(request):
     subject = ""
@@ -1067,6 +830,10 @@ def _get_server_zip():
         staticfiles_bytes = json.dumps(_get_staticfiles()).encode()
         zipf.writestr("tph/staticfiles_mapping.json", staticfiles_bytes)
 
+        # store media files mapping
+        if os.path.exists(settings.ASSET_MAPPING):
+            zipf.write(settings.ASSET_MAPPING, "tph/media_mapping.yaml")
+
         # create and store sqlite database
         with tempfile.TemporaryDirectory() as tmp:
             fname = "db.sqlite3"
@@ -1074,10 +841,11 @@ def _get_server_zip():
                 [
                     f"{server_dir}/create_pyodide_database.py",
                     f"{tmp}/{fname}",
-                    f"{server_dir}/tph/fixtures/pyodide.yaml",
-                    # TODO: test that this works with fixture directory.
-                    *glob.glob(f"{server_dir}/tph/fixtures/puzzles/*.yaml"),
-                ]
+                    f"{server_dir}/tph/fixtures/posthunt/team.yaml",
+                    f"{server_dir}/tph/fixtures/posthunt/dump.yaml",
+                    f"{server_dir}/tph/fixtures/posthunt/access.yaml",
+                ],
+                check=True,
             )
             zipf.write(f"{tmp}/{fname}", fname)
     fileobj.seek(0)

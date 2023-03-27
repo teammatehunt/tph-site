@@ -61,7 +61,7 @@ class Shortcuts:
         "Create team"
         models.Team(
             user=user,
-            team_name=user.username,
+            name=user.username,
             is_hidden=True,
         ).save()
 
@@ -84,34 +84,12 @@ class Shortcuts:
 
     def hint_0(team):
         "=0"
-        team.total_hints_awarded -= team.num_hints_remaining
+        team.total_hints_awarded = 0
         team.save()
 
     def reset_hints(team):
         "Reset"
         team.total_hints_awarded = 0
-        team.save()
-
-    FREE_ANSWERS = "Free answers (my team)"
-
-    def free_answer_1(team):
-        "+1"
-        team.total_free_answers_awarded += 1
-        team.save()
-
-    def free_answer_5(team):
-        "+5"
-        team.total_free_answers_awarded += 5
-        team.save()
-
-    def free_answer_0(team):
-        "=0"
-        team.total_free_answers_awarded -= team.num_free_answers_remaining
-        team.save()
-
-    def reset_free_answers(team):
-        "Reset"
-        team.total_free_answers_awarded = 0
         team.save()
 
     PUZZLE = "This puzzle"
@@ -128,31 +106,31 @@ class Shortcuts:
 
     def solve(puzzle, team):
         "Solve"
-        if not team.answersubmission_set.filter(
-            puzzle=puzzle, is_correct=True
+        if not team.puzzlesubmission_set.filter(
+            puzzle__puzzle=puzzle, correct=True
         ).exists():
-            team.answersubmission_set.create(
+            team.puzzlesubmission_set.create(
                 puzzle=puzzle,
-                submitted_answer=puzzle.normalized_answer,
-                is_correct=True,
+                answer=puzzle.normalized_answer,
+                correct=True,
                 used_free_answer=False,
             )
 
     def free_answer(puzzle, team):
         "Free"
-        if not team.answersubmission_set.filter(
-            puzzle=puzzle, is_correct=True
+        if not team.puzzlesubmission_set.filter(
+            puzzle__puzzle=puzzle, correct=True
         ).exists():
-            team.answersubmission_set.create(
+            team.puzzlesubmission_set.create(
                 puzzle=puzzle,
-                submitted_answer=puzzle.normalized_answer,
-                is_correct=True,
+                answer=puzzle.normalized_answer,
+                correct=True,
                 used_free_answer=True,
             )
 
     def unsolve(puzzle, team):
         "Unsolve"
-        team.answersubmission_set.filter(puzzle=puzzle, is_correct=True).delete()
+        team.puzzlesubmission_set.filter(puzzle__puzzle=puzzle, correct=True).delete()
 
     PUZZLE_HINTS = "Request hint on this puzzle"
 
@@ -169,7 +147,7 @@ class Shortcuts:
         hint_response = hint_request.get_or_populate_response()
         hint_request.response = hint_response
         hint_request.status = models.Hint.ANSWERED
-        hint_response.submitted_datetime = now
+        hint_response.timestamp = now
         hint_response.text_content = "Ok"
         with transaction.atomic():
             hint_request.save(update_fields=("status", "response"))
@@ -213,4 +191,4 @@ class Shortcuts:
 
     def delete_guesses(puzzle, team):
         "Guesses"
-        team.answersubmission_set.filter(puzzle=puzzle).delete()
+        team.puzzlesubmission_set.filter(puzzle__puzzle=puzzle).delete()

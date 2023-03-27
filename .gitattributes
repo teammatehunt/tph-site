@@ -1,0 +1,2 @@
+# Convert all line endings to lf on commit, prevent crlf on checkout
+text=auto eol=lf

@@ -1,4 +1,4 @@
-import { useRouter } from 'next/router';
+import { useRouter } from 'utils/router';
 
 import Login from 'components/login';
 import Section from 'components/section';
@@ -8,7 +8,7 @@ const LoginPage = () => {
 
   return (
     <Section narrow>
-      <Login onLoggedIn={() => router.push('/')} />
+      <Login />
     </Section>
   );
 };

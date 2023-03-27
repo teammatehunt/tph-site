@@ -1,24 +1,43 @@
-version: '3.7'
+version: "3.7"
 
 services:
+  db:
+    volumes:
+      - pgdata:/var/lib/postgresql/data
   tph:
     build:
       context: .
       target: output_dev
     environment:
       - SERVER_ENVIRONMENT=dev
-      - SERVER_HOSTNAME=localhost
+      - CELERY_NUM_PROCS=1
+      - GOOGLE_ANALYTICS_ID=FIXME
+      - HUNT_HOST=localhost:8081
+      - CADDY_HUNT_HOST=localhost:8081
+      - REGISTRATION_HOST=localhost:8083
+      - CADDY_REGISTRATION_HOST=localhost:8083
+      - ENABLE_HUNT_SITE=1
+      - ENABLE_REGISTRATION_SITE=0
+      - ENABLE_POSTHUNT_SITE=0
+    networks:
+      default:
+        aliases:
+          - django
     ports:
-      - '127.0.0.1:8080:80'
-      - '127.0.0.1:8081:443'
+      - "127.0.0.1:8080-8083:8080-8083"
+      - "127.0.0.1:8081-8083:8081-8083/udp"
     volumes:
       - .:/app # rw on dev
       - /app/client/node_modules # ignore host node_modules
+      - /app/reg-client/node_modules # ignore host node_modules
       - /app/client/.next # ignore host .next
+      - /app/reg-client/.next # ignore host .next
       - ./client/.docker.yarnrc:/app/client/.yarnrc:ro
       - srv_dev:/srv
       - ./deploy/Caddyfile.dev:/Caddyfile:ro
+      - ./deploy/supervisord.base.conf:/etc/supervisord.base.conf:ro
       - ./deploy/supervisord.dev.conf:/etc/supervisord.conf:ro
 
 volumes:
+  pgdata:
   srv_dev:

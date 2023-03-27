@@ -1,0 +1,9 @@
+- model: spoilr_core.huntsetting
+  pk: 4
+  fields:
+    name: spoilr.hints.max_open_hints
+    text_value: '1'
+    boolean_value: null
+    date_value: null
+    create_time: 2022-11-30 04:33:24.101643+00:00
+    update_time: 2022-11-30 04:37:44.394119+00:00

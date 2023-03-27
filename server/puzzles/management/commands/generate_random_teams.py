@@ -2,10 +2,12 @@
 # randomly generating stuff. If we get unlucky and generate something
 # non-unique, just try again.
 from django.core.management.base import BaseCommand
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from datetime import datetime
-from puzzles.models import Team, Puzzle, AnswerSubmission, Survey
+from puzzles.models import Team, Puzzle, PuzzleSubmission, Survey
 import random
+
+User = get_user_model()
 
 # for flavor, and to test unicode // http://racepics.weihwa.com/
 emoji = "💥💫🐒🦍🐕🐺🦊🐈🦁🐅🐆🐎🦄🦌🐂🐃🐄🐖🐗🐏🐑🐐🐪🐘🦏🐁🐀🐹🐇🐿🦇🐻🐨🐼🐾🦃🐔🐓🐤🐦🐧🕊🦅🦆🦉🐸🐊🐢🦎🐍🐉🐳🐋🐬🐟🐠🐡🦈🐙🐚🐌🦋🐛🐜🐝🐞🕷🕸🦂💐🌸💮🌹🌺🌻🌼🌷🌱🌲🌳🌴🌵🌾🌿☘🍀🍁🍃🍄🌰🦀🦐🦑🌐🌙⭐🌈⚡🔥🌊✨🎮🎲🧩♟🎭🎨🧵🎤🎧🎷🎸🎹🎺🎻🥁🎬🏹🌋🏖🏜🏝🏠🏤🏥🏦🏫🌃🏙🌅🌇🚆🚌🚕🚗🚲⚓✈🚁🚀🛸🎆"
@@ -45,14 +47,14 @@ class Command(BaseCommand):
         n = options["num_teams"][0]
         teams = []
         for i in range(n):
-            username = "team{}".format(random.randint(0, 10 ** 10))
+            username = "team{}".format(random.randint(0, 10**10))
 
             user = User.objects.create_user(
                 username=username, email=username + "@example.com", password="password"
             )
             team = Team(
                 user=user,
-                team_name=random_team_name(),
+                name=random_team_name(),
                 creation_time=datetime.now(),
             )
             team.save()
@@ -72,20 +74,20 @@ class Command(BaseCommand):
                 for i in range(random.randint(0, 10)):
                     if random.random() < success_prob:
                         break
-                    AnswerSubmission(
-                        team=team,
-                        puzzle=puzzle,
-                        submitted_answer=wrong_answers[i],
-                        is_correct=False,
+                    PuzzleSubmission(
+                        team=team.spoilr_team,
+                        puzzle=puzzle.spoilr_puzzle,
+                        answer=wrong_answers[i],
+                        correct=False,
                         used_free_answer=False,
                     ).save()
 
                 if random.random() < success_prob:
-                    AnswerSubmission(
-                        team=team,
-                        puzzle=puzzle,
-                        submitted_answer=puzzle.normalized_answer,
-                        is_correct=True,
+                    PuzzleSubmission(
+                        team=team.spoilr_team,
+                        puzzle=puzzle.spoilr_puzzle,
+                        answer=puzzle.normalized_answer,
+                        correct=True,
                         used_free_answer=False,
                     ).save()
 

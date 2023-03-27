@@ -11,10 +11,7 @@ SEND_DISCORD_ALERTS = False
 
 IS_TEST = True
 
-DOMAIN = "localhost:8081"
-
-# FIXME
-EMAIL_USER_DOMAIN = os.environ.get("EMAIL_USER_DOMAIN", "staging.mypuzzlehunt.com")
+EMAIL_USER_DOMAIN = os.environ.get("EMAIL_USER_DOMAIN", "staging.teammatehunt.com")
 
 ALLOWED_HOSTS = ["*"]
 
@@ -28,10 +25,7 @@ if IS_TEST:
         with open(dev_list_file) as f:
             DEV_EMAIL_WHITELIST.update(f.read().strip().split())
 
-# this is different because webpack-dev-server is serving /static in dev,
-# and the webserver needs to be able to point the browser to the right place
-STATIC_URL = "/static/"
-STATIC_ROOT = "static"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 # silk request logging if enabled
 SILK_ENABLED = False
@@ -44,6 +38,8 @@ if SILK_ENABLED:
     # discard raw requests and responses exceeding size
     SILKY_MAX_REQUEST_BODY_SIZE = 0
     SILKY_MAX_RESPONSE_BODY_SIZE = 0
+    # use cProfile
+    SILKY_PYTHON_PROFILER = True
 
 
 LOGGING = {
@@ -63,7 +59,7 @@ LOGGING = {
     },
     "handlers": {
         "django": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.FileHandler",
             "filename": LOG_BASE_DIR / "django.log",
             "formatter": "django-file",
@@ -75,7 +71,7 @@ LOGGING = {
             "formatter": "django-file",
         },
         "puzzle": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.FileHandler",
             "filename": LOG_BASE_DIR / "puzzle.log",
             "formatter": "puzzles-file",
@@ -87,7 +83,7 @@ LOGGING = {
             "formatter": "puzzles-file",
         },
         "request": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.FileHandler",
             "filename": LOG_BASE_DIR / "request.log",
             "formatter": "puzzles-file",
@@ -99,12 +95,12 @@ LOGGING = {
             "formatter": "puzzles-file",
         },
         "django-console": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "django-console",
         },
         "puzzles-console": {
-            "level": "DEBUG",
+            "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "puzzles-console",
         },
@@ -112,16 +108,16 @@ LOGGING = {
     "loggers": {
         "django": {
             "handlers": ["django", "django-console", "django-errors"],
-            "level": "DEBUG",
+            "level": "INFO",
             "propagate": True,
         },
         "django.db.backends": {
-            "level": "DEBUG",
+            "level": "INFO",
             "handlers": ["django"],
             "propagate": False,
         },
         "django.server": {
-            "level": "DEBUG",
+            "level": "INFO",
             "handlers": ["django"],
             "propagate": False,
         },
@@ -131,24 +127,24 @@ LOGGING = {
         },
         "puzzles": {
             "handlers": ["puzzles-console"],
-            "level": "DEBUG",
+            "level": "INFO",
             "propagate": True,
         },
         "puzzles.puzzle": {
             "handlers": ["puzzle", "puzzles-console", "puzzle-errors"],
-            "level": "DEBUG",
+            "level": "INFO",
             "propagate": False,
         },
         "puzzles.request": {
             "handlers": ["request", "puzzles-console", "request-errors"],
-            "level": "DEBUG",
+            "level": "INFO",
             "propagate": False,
         },
     },
 }
 try:
     assert getpass.getuser() == "root"
-except:
+except (AssertionError, KeyError):
     # The makemigrations script uses the host user, not the user inside the
     # docker container. This causes errors with django file logging, so we
     # disable file logging in this case.

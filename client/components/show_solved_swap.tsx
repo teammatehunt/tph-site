@@ -29,17 +29,17 @@ const ShowSolvedSwap: FunctionComponent<Props> = ({
 
   return (
     <>
-      <div>
+      <div className="flex items-center">
         <i>Show all as</i>:
         <button
-          className="small-caps"
+          className="font-smallcaps"
           disabled={!showSolved}
           onClick={swap(false)}
         >
           Unsolved
         </button>
         <button
-          className="small-caps"
+          className="font-smallcaps"
           disabled={showSolved}
           onClick={swap(true)}
         >
@@ -65,8 +65,6 @@ const ShowSolvedSwap: FunctionComponent<Props> = ({
         div {
           color: var(--primary);
           font-size: 16px;
-          display: flex;
-          align-items: center;
           margin-bottom: 16px;
         }
       `}</style>

@@ -8,21 +8,22 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
-from tph.utils import generate_url
+from spoilr.core.api.hunt import (
+    get_site_close_time,
+    get_site_end_time,
+    get_site_launch_time,
+)
+from spoilr.email.models import BadEmailAddress, Email
+from spoilr.registration.models import TeamRegistrationInfo
+from spoilr.utils import generate_url
 
 from puzzles.forms import ProfilePictureForm, TeamEditForm, UnsubscribeEmailForm
-from puzzles.hunt_config import (
-    HUNT_CLOSE_TIME,
-    HUNT_END_TIME,
-    HUNT_START_TIME,
-    TEAM_SIZE,
-)
 from puzzles.messaging import (
     dispatch_bad_profile_pic_alert,
     dispatch_general_alert,
     dispatch_profile_pic_alert,
 )
-from puzzles.models import BadEmailAddress, Email, Team, TeamMember
+from puzzles.models import Team
 from puzzles.utils import login_required
 from puzzles.views.auth import restrict_access
 
@@ -30,10 +31,7 @@ from puzzles.views.auth import restrict_access
 def get_profile_pic_url(request, team, victory=False):
     # This returns the URL, even if the picture isn't approved yet, because we
     # use this to decide whether to display an "under review" message or not.
-    if victory or request.context.hunt_is_over:
-        profile_pic = team.profile_pic_victory.name or team.profile_pic.name
-    else:
-        profile_pic = team.profile_pic.name
+    profile_pic = team.profile_pic.name
     if profile_pic:
         profile_pic = os.path.join(settings.MEDIA_URL, profile_pic)
     return profile_pic
@@ -66,10 +64,8 @@ def get_team_info(request, slug=None):
         return JsonResponse({}, status=404)
 
     team_info = {
-        "name": team.team_name,
+        "name": team.name,
         "slug": team.slug,
-        "members": team.get_members(with_emails=is_own_team),
-        "profile_pic_approved": team.profile_pic_approved,
     }
     if is_own_team or team.profile_pic_approved:
         team_info["profile_pic"] = get_profile_pic_url(
@@ -78,39 +74,30 @@ def get_team_info(request, slug=None):
     if not can_view_info:
         return JsonResponse({"teamInfo": team_info, "canModify": False})
 
-    # This Team.leaderboard() call is expensive, but is the only way
-    # right now to calculate rank accurately. Hopefully it is not an
-    # issue in practice.
-    leaderboard = Team.leaderboard(user_team)
-    rank = None
-    for i, leaderboard_team in enumerate(leaderboard):
-        if team.team_name == leaderboard_team["team_name"]:
-            rank = i + 1  # ranks are 1-indexed
-            break
-
+    START_TIME = get_site_launch_time()
+    END_TIME = get_site_end_time()
+    CLOSE_TIME = get_site_close_time()
     guesses = defaultdict(int)
     correct = {}
     team_solves = {}
     unlock_time_map = {
-        unlock.puzzle_id: max(HUNT_START_TIME, unlock.unlock_datetime)
-        for unlock in team.db_unlocks
+        unlock.puzzle_id: max(START_TIME, unlock.timestamp)
+        for unlock in team.puzzles.all()
     }
-    for submission in team.submissions:
-        if submission.is_correct:
+    for submission in team.puzzlesubmission_set.select_related("puzzle"):
+        if submission.correct:
             team_solves[submission.puzzle_id] = submission.puzzle
             correct[submission.puzzle_id] = {
-                "slug": submission.puzzle.solution_slug,
+                "slug": submission.puzzle.slug,
                 "name": submission.puzzle.name,
                 "is_meta": submission.puzzle.is_meta,
-                "answer": submission.submitted_answer,
-                "unlock_time": unlock_time_map.get(
-                    submission.puzzle_id, HUNT_START_TIME
-                ),
-                "solve_time": submission.submitted_datetime,
+                "answer": submission.answer,
+                "unlock_time": unlock_time_map.get(submission.puzzle_id, START_TIME),
+                "solve_time": submission.timestamp,
                 "used_free_answer": submission.used_free_answer,
                 "open_duration": (
-                    submission.submitted_datetime
-                    - unlock_time_map.get(submission.puzzle_id, HUNT_START_TIME)
+                    submission.timestamp
+                    - unlock_time_map.get(submission.puzzle_id, START_TIME)
                 ).total_seconds(),
             }
         else:
@@ -120,28 +107,27 @@ def get_team_info(request, slug=None):
         correct[puzzle]["guesses"] = guesses[puzzle]
         submissions.append(correct[puzzle])
     submissions.sort(key=lambda submission: submission["solve_time"])
-    solves = [HUNT_START_TIME] + [s["solve_time"] for s in submissions]
-    if solves[-1] >= HUNT_END_TIME:
-        solves.append(min(request.context.now, HUNT_CLOSE_TIME))
+    solves = [START_TIME] + [s["solve_time"] for s in submissions]
+    if solves[-1] >= END_TIME:
+        solves.append(min(request.context.now, CLOSE_TIME))
     else:
-        solves.append(HUNT_END_TIME)
+        solves.append(END_TIME)
     chart = {
-        "hunt_length": (solves[-1] - HUNT_START_TIME).total_seconds(),
+        "hunt_length": (solves[-1] - START_TIME).total_seconds(),
         "solves": [
             {
-                "before": (solves[i - 1] - HUNT_START_TIME).total_seconds(),
-                "after": (solves[i] - HUNT_START_TIME).total_seconds(),
+                "before": (solves[i - 1] - START_TIME).total_seconds(),
+                "after": (solves[i] - START_TIME).total_seconds(),
             }
             for i in range(1, len(solves))
         ],
         "metas": [
-            (s["solve_time"] - HUNT_START_TIME).total_seconds()
+            (s["solve_time"] - START_TIME).total_seconds()
             for s in submissions
             if s["is_meta"]
         ],
-        "end": (HUNT_END_TIME - HUNT_START_TIME).total_seconds(),
+        "end": (END_TIME - START_TIME).total_seconds(),
     }
-    team.solves = team_solves
 
     return JsonResponse(
         {
@@ -150,25 +136,29 @@ def get_team_info(request, slug=None):
             "chart": chart,
             "solves": sum(1 for s in submissions if not s["used_free_answer"]),
             "canModify": is_own_team and not request.context.hunt_is_closed,
-            "rank": rank,
         }
     )
 
 
 @require_GET
-def teams(request):
-    return JsonResponse(
-        {
-            "teams": Team.leaderboard(request.context.team),
-        }
+def registration_teams(request):
+    teams_list = TeamRegistrationInfo.objects.values("team_name", "bg_bio").order_by(
+        "team_name"
     )
+    teams_list = [
+        {"name": team["team_name"], "bio": team["bg_bio"]} for team in teams_list
+    ]
+
+    return JsonResponse({"teamsList": teams_list})
 
 
 def profile_pic_discord_content(request, team):
-    profile_pic_url = generate_url(get_profile_pic_url(request, team))
-    approve_url = generate_url(reverse("approve_picture", args=[team.user.username]))
+    profile_pic_url = generate_url("prehunt", get_profile_pic_url(request, team))
+    approve_url = generate_url(
+        "prehunt", reverse("approve_picture", args=[team.username])
+    )
     content = f"""
-    {team.team_name} updated their team photo to {profile_pic_url}.
+    {team.name} updated their team photo to {profile_pic_url}.
     You may approve it at {approve_url}. React to this Discord message if you've
     done so.
     """
@@ -219,7 +209,7 @@ def upload_profile_pic(request, slug):
             if error_msg == ProfilePictureForm.unsupported_media_type_error_message:
                 status = 415
                 dispatch_bad_profile_pic_alert(
-                    f":frame_photo: Team {user_team.team_name} tried to upload a bad profile picture."
+                    f":frame_photo: Team {user_team.name} tried to upload a bad profile picture."
                 )
                 break
 
@@ -254,27 +244,6 @@ def edit_team(request, slug):
         form_errors.update(form.errors)
     if form_errors:
         return JsonResponse({"form_errors": form_errors}, status=400)
-
-    if form.is_valid():
-        data = [
-            (form.cleaned_data[f"name{i+1}"], form.cleaned_data[f"email{i+1}"])
-            for i in range(TEAM_SIZE)
-        ]
-
-        # Fetch all teammates and update their data
-        teammates = team.teammember_set.order_by("pk").all()
-        for i, (name, email) in enumerate(data):
-            if i >= len(teammates) and name:
-                TeamMember.objects.create(team=team, name=name, email=email)
-            elif name:
-                teammates[i].name = name
-                teammates[i].email = email
-                teammates[i].save()
-            elif i < len(teammates):
-                teammates[i].delete()
-
-        members = ", ".join([str(member) for member in team.teammember_set.all()])
-        dispatch_general_alert(f"Team {team} updated teammates: {members}")
 
     return JsonResponse({})
 

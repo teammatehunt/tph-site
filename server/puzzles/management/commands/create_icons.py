@@ -156,23 +156,13 @@ class Command(BaseCommand):
                 print(f"Completed {puzzle.slug}")
                 continue
             # Save the icons
-            if puzzle.is_intro():
-                self.upload_image(
-                    puzzle.unsolved_icon,
-                    os.path.join(self.path(puzzle), "intro-unsolved.png"),
-                )
-                self.upload_image(
-                    puzzle.solved_icon,
-                    os.path.join(self.path(puzzle), "intro-solved.png"),
-                )
-            else:
-                self.upload_image(
-                    puzzle.unsolved_icon,
-                    os.path.join(self.path(puzzle), "unsolved.png"),
-                )
-                self.upload_image(
-                    puzzle.solved_icon, os.path.join(self.path(puzzle), "solved.png")
-                )
+            self.upload_image(
+                puzzle.unsolved_icon,
+                os.path.join(self.path(puzzle), "unsolved.png"),
+            )
+            self.upload_image(
+                puzzle.solved_icon, os.path.join(self.path(puzzle), "solved.png")
+            )
             # Height must be set after dimensions are known.
             puzzle.icon_size = self.height(puzzle)
             puzzle.save()

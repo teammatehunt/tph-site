@@ -5,13 +5,15 @@ cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
 
 # Usage: ./scripts/save_fixtures
 
-echo "Are you sure you have all existing puzzle changes? This will overwrite files in tph/fixtures/puzzles. [y/N]"
+echo "Are you sure you have all existing db changes? This will overwrite files in server/tph/fixtures. [y/N]"
 read line
 if [[ $line == "y" ]]; then
-    mkdir -p server/tph/fixtures/puzzles
-    docker-compose exec tph /app/server/manage.py puzzle_fixtures fixtures/puzzles --save
-else
+    mkdir -p server/tph/fixtures/{puzzles,rounds,events,story,interactions,emails}
+    docker-compose exec tph /app/server/manage.py puzzle_fixtures --fixtures-dir fixtures --save "$@"
 
+    docker-compose exec -T tph /app/server/manage.py setting_fixtures fixtures/settings --save "$@"
+
+else
     echo "Stopping"
     exit 1
 fi

@@ -1,0 +1,25 @@
+name: deploy-branch-backend
+
+on:
+  workflow_dispatch:
+
+concurrency: deploy-branch-backend
+
+jobs:
+  deploy-branch-backend:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      TEST_BRANCH_BACKEND: 1
+      DEPLOY_USER: branch
+      DEPLOY_HOST: branch.teammatehunt.com
+      DEPLOY_TYPE: branch.backend
+      SERVER_ENVIRONMENT: test_branch
+      BRANCH_BACKEND_HOSTNAME: branch.teammatehunt.com
+      HUNT_HOST: branch.teammatehunt.com
+      REGISTRATION_HOST: branch.teammatehunt.com:8083
+      COPY_DRIVE_CREDS: 1
+      EXTRA_ENV: |-
+        # serve HTTP on 172.17.0.1:28080
+        SERVER_HTTP_BIND_PREFIX=172.17.0.1:28
+        GOOGLE_ANALYTICS_ID=FIXME
+    secrets: inherit

@@ -1,0 +1,29 @@
+# This docker compose override file is used for Github CI/CD deployments
+version: '3.7'
+
+services:
+  tph:
+    image: ${IMAGE_TAG}
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - '${SERVER_HTTP_BIND_PREFIX}080:80'
+      - '${SERVER_HTTP_BIND_PREFIX}443:443'
+      - '${SERVER_HTTP_BIND_PREFIX}444:8082'
+      - '${SERVER_HTTP_BIND_PREFIX}445:8083'
+      - '${SERVER_HTTP_BIND_PREFIX}443:443/udp'
+      - '${SERVER_HTTP_BIND_PREFIX}444:8082/udp'
+      - '${SERVER_HTTP_BIND_PREFIX}445:8083/udp'
+    expose:
+      - '8000'
+    volumes:
+      - ${HOME}/srv:/srv
+    networks:
+      default:
+      branch_server_network:
+        aliases:
+          - django
+
+networks:
+  branch_server_network:
+    name: branch_server_network

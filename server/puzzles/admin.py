@@ -2,71 +2,82 @@ from django import forms
 from django.contrib import admin
 from django.db import transaction
 from django.urls import reverse
+from spoilr.core.models import PseudoAnswer
+from spoilr.hints.models import CannedHint
 
 from puzzles.models import (
-    AnswerSubmission,
-    BadEmailAddress,
     CustomPuzzleSubmission,
-    Email,
-    EmailTemplate,
-    Errata,
+    DeepFloor,
     ExtraGuessGrant,
-    Hint,
+    ExtraUnlock,
+    Feedback,
+    Minipuzzle,
     Puzzle,
-    PuzzleMessage,
-    PuzzleUnlock,
-    StoryCard,
-    StoryCardUnlock,
+    PuzzleAccess,
+    PuzzleSubmission,
     Survey,
     Team,
-    TeamMember,
 )
-from puzzles.models.interactive import PuzzleAction, PuzzleState
+from puzzles.models.interactive import PuzzleAction, PuzzleState, Session, UserState
+from puzzles.models.story import StoryCard, StoryCardAccess, StoryState
 
 
-class PuzzleMessageInline(admin.TabularInline):
-    model = PuzzleMessage
+class PseudoAnswerInline(admin.TabularInline):
+    model = PseudoAnswer
+
+
+class CannedHintInline(admin.TabularInline):
+    model = CannedHint
 
 
 class PuzzleAdmin(admin.ModelAdmin):
-    inlines = [PuzzleMessageInline]
-    ordering = ("deep", "name")
+    inlines = [PseudoAnswerInline, CannedHintInline]
+    ordering = ("round__order", "deep", "name")
     list_display = (
         "name",
         "slug",
         "round",
         "deep",
-        "metameta_deep",
         "emoji",
         "is_meta",
     )
     list_filter = ("is_meta", "round")
+    search_fields = ("name", "slug", "id", "round__name", "round__slug")
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = list(super().get_fieldsets(request, obj))
+        overrides = ("override_hint_unlocked", "override_virtual_unlocked")
+        return [
+            (
+                "Overrides",
+                {"fields": overrides},
+            ),
+            (
+                "Metadata",
+                {
+                    "fields": [
+                        field
+                        for field in fieldsets[0][1]["fields"]
+                        if field not in overrides
+                    ]
+                },
+            ),
+        ]
 
     def view_on_site(self, obj):
-        return f"/puzzles/{obj.slug}"
-
-
-class TeamMemberAdmin(admin.ModelAdmin):
-    list_display = ("name", "email", "team")
-    list_filter = ("team",)
-    search_fields = ("name", "email")
-
-
-class TeamMemberInline(admin.TabularInline):
-    model = TeamMember
+        return obj.url
 
 
 class TeamAdmin(admin.ModelAdmin):
-    inlines = [TeamMemberInline]
     list_display = (
-        "team_name",
+        "name",
         "slug",
         "creation_time",
         "is_prerelease_testsolver_short",
         "is_hidden",
     )
     list_filter = ("is_prerelease_testsolver", "is_hidden")
-    search_fields = ("team_name",)
+    search_fields = ("name",)
 
     # You can't sort by this column but meh.
     def is_prerelease_testsolver_short(self, obj):
@@ -75,26 +86,25 @@ class TeamAdmin(admin.ModelAdmin):
     is_prerelease_testsolver_short.short_description = "Prerel.?"
     is_prerelease_testsolver_short.boolean = True
 
-    def view_on_site(self, obj):
-        return obj.team_url
 
-
-class PuzzleUnlockAdmin(admin.ModelAdmin):
-    list_display = ("team", "puzzle", "unlock_datetime")
+class PuzzleAccessAdmin(admin.ModelAdmin):
+    list_display = ("team", "puzzle", "timestamp")
     list_filter = ("puzzle", "team")
+    autocomplete_fields = ("puzzle",)
 
 
-class AnswerSubmissionAdmin(admin.ModelAdmin):
+class PuzzleSubmissionAdmin(admin.ModelAdmin):
     list_display = (
         "team",
         "puzzle",
-        "submitted_answer",
-        "submitted_datetime",
-        "is_correct",
+        "answer",
+        "timestamp",
+        "correct",
         "used_free_answer",
     )
-    list_filter = ("is_correct", "used_free_answer", "puzzle", "team")
-    search_fields = ("submitted_answer",)
+    list_filter = ("correct", "used_free_answer", "puzzle", "team")
+    search_fields = ("team__name", "puzzle__slug", "answer")
+    autocomplete_fields = ("team", "puzzle")
 
 
 class ExtraGuessGrantAdmin(admin.ModelAdmin):
@@ -108,133 +118,122 @@ class SurveyAdmin(admin.ModelAdmin):
     search_fields = ("comments",)
 
 
-class BadEmailAddressAdmin(admin.ModelAdmin):
-    list_display = ("email", "reason")
-    list_filter = ("reason",)
+class FeedbackAdmin(admin.ModelAdmin):
+    list_display = ("team", "puzzle")
+    list_filter = ("puzzle", "team")
+    search_fields = ("comments",)
 
 
-class EmailTemplateAdmin(admin.ModelAdmin):
-    list_display = (
-        "scheduled_datetime",
-        "subject",
-        "from_address",
-        "status",
-    )
-    list_filter = ("from_address", "status")
-
-
-class EmailAdmin(admin.ModelAdmin):
-    list_display = (
-        "subject",
-        "from_address",
-        "to_addresses",
-        "cc_and_bcc_len",
-        "team",
-        "date",
-        "status",
-    )
-    list_filter = ("status", "team")
-    search_fields = ("from_address", "to_addresses", "cc_addresses", "bcc_addresses")
-    readonly_fields = ("raw_content_",)
-
-    def raw_content_(self, obj):
-        return str(obj.raw_content, "utf-8", "backslashreplace")
-
-    def cc_and_bcc_len(self, obj):
-        return len(obj.cc_addresses) + len(obj.bcc_addresses)
-
-    cc_and_bcc_len.short_description = "CC+BCC"
-
-    def date(self, obj):
-        return obj.received_datetime
-
-    date.admin_order_field = "received_datetime"
-
-
-class HintAdmin(admin.ModelAdmin):
-    def view_on_site(self, obj):
-        return reverse("hint", args=(obj.id,))
-
+class MinipuzzleAdmin(admin.ModelAdmin):
     list_display = (
         "team",
         "puzzle",
-        "is_request",
-        "submitted_datetime",
-        "claimer",
-        "claimed_datetime",
-        "status",
-        # "answered_datetime",
+        "ref",
+        "solved",
+        "create_time",
+        "solved_time",
     )
-    list_filter = (
-        "status",
-        "is_request",
-        "claimed_datetime",
-        # "answered_datetime",
-        "puzzle",
-        "team",
-        "claimer",
-    )
-    search_fields = ("text_content",)
-
-
-class StoryCardAdmin(admin.ModelAdmin):
-    list_display = (
-        "slug",
-        "text",
-        "deep",
-        "unlock_order",
-        "min_main_round_solves",
-    )
-    list_filter = ("slug", "deep")
-    ordering = ("deep", "unlock_order", "slug")
-
-
-class StoryCardUnlockAdmin(admin.ModelAdmin):
-    list_display = ("team", "story_card", "unlock_datetime")
-    list_filter = ("story_card", "team")
-
-
-class ErrataAdmin(admin.ModelAdmin):
-    list_display = ("puzzle", "text", "creation_time")
-    list_filter = ("puzzle",)
+    list_filter = ("team", "puzzle", "ref", "solved")
+    autocomplete_fields = ("team", "puzzle")
 
 
 class CustomSubmissionAdmin(admin.ModelAdmin):
     list_display = (
-        "submission",
+        "raw_answer",
         "team",
         "puzzle",
-        "subpuzzle",
-        "is_correct",
+        "minipuzzle",
+        "correct",
         "count",
     )
-    list_filter = ("team", "puzzle", "subpuzzle", "is_correct")
+    list_filter = ("team", "puzzle", "minipuzzle", "correct")
+    autocomplete_fields = ("team", "puzzle")
 
 
 class PuzzleActionAdmin(admin.ModelAdmin):
-    list_display = ("team", "puzzle", "action", "datetime")
-    list_filter = ("team", "puzzle", "action")
+    list_display = ("team", "puzzle", "subpuzzle", "action", "datetime")
+    list_filter = ("team", "puzzle", "subpuzzle", "action")
+    autocomplete_fields = ("team", "puzzle")
 
 
 class PuzzleStateAdmin(admin.ModelAdmin):
     list_display = ("team", "puzzle")
     list_filter = ("team", "puzzle")
+    autocomplete_fields = ("team", "puzzle")
 
 
-admin.site.register(Puzzle, PuzzleAdmin)
-admin.site.register(Team, TeamAdmin)
-admin.site.register(TeamMember, TeamMemberAdmin)
-admin.site.register(PuzzleUnlock, PuzzleUnlockAdmin)
-admin.site.register(AnswerSubmission, AnswerSubmissionAdmin)
+class SessionAdmin(admin.ModelAdmin):
+    list_display = (
+        "team",
+        "puzzle",
+        "storycard",
+        "start_time",
+        "finish_time",
+        "is_complete",
+    )
+    list_filter = (
+        "team",
+        "puzzle",
+        "storycard",
+        "start_time",
+        "finish_time",
+        "is_complete",
+    )
+    autocomplete_fields = ("team", "puzzle", "storycard")
+
+
+class StoryCardAdmin(admin.ModelAdmin):
+    list_display = ("slug", "order", "act", "title", "text", "puzzle")
+    list_filter = ("slug", "text")
+    search_fields = ("slug", "title")
+    autocomplete_fields = ("puzzle",)
+
+
+class StoryCardAccessAdmin(admin.ModelAdmin):
+    list_display = ("team", "story_card", "timestamp")
+    list_filter = ("story_card", "team")
+    autocomplete_fields = ("story_card", "team")
+
+
+class StoryStateAdmin(admin.ModelAdmin):
+    list_display = ("team", "state")
+    list_filter = ("team", "state")
+    autocomplete_fields = ("team",)
+
+
+class UserStateAdmin(admin.ModelAdmin):
+    list_display = ("team", "puzzle", "uuid")
+    list_filter = ("team", "puzzle", "uuid")
+    autocomplete_fields = ("team", "puzzle")
+
+
+class DeepFloorAdmin(admin.ModelAdmin):
+    list_display = ("team", "timestamp", "enabled", "deep_key", "min_deep")
+    list_filter = ("team", "enabled", "deep_key")
+    autocomplete_fields = ("team",)
+
+
+class ExtraUnlockAdmin(admin.ModelAdmin):
+    list_display = ("team", "deep_key", "count")
+    list_filter = ("team", "deep_key")
+    autocomplete_fields = ("team",)
+
+
 admin.site.register(CustomPuzzleSubmission, CustomSubmissionAdmin)
+admin.site.register(DeepFloor, DeepFloorAdmin)
 admin.site.register(ExtraGuessGrant, ExtraGuessGrantAdmin)
+admin.site.register(ExtraUnlock, ExtraUnlockAdmin)
+admin.site.register(Puzzle, PuzzleAdmin)
+admin.site.register(PuzzleAccess, PuzzleAccessAdmin)
+admin.site.register(PuzzleSubmission, PuzzleSubmissionAdmin)
+admin.site.register(Minipuzzle, MinipuzzleAdmin)
 admin.site.register(Survey, SurveyAdmin)
-admin.site.register(BadEmailAddress, BadEmailAddressAdmin)
-admin.site.register(EmailTemplate, EmailTemplateAdmin)
-admin.site.register(Email, EmailAdmin)
-admin.site.register(Hint, HintAdmin)
-admin.site.register(StoryCard, StoryCardAdmin)
-admin.site.register(StoryCardUnlock, StoryCardUnlockAdmin)
-admin.site.register(Errata, ErrataAdmin)
+admin.site.register(Feedback, FeedbackAdmin)
 admin.site.register(PuzzleAction, PuzzleActionAdmin)
 admin.site.register(PuzzleState, PuzzleStateAdmin)
+admin.site.register(UserState, UserStateAdmin)
+admin.site.register(Session, SessionAdmin)
+admin.site.register(StoryCard, StoryCardAdmin)
+admin.site.register(StoryCardAccess, StoryCardAccessAdmin)
+admin.site.register(StoryState, StoryStateAdmin)
+admin.site.register(Team, TeamAdmin)

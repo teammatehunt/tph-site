@@ -5,4 +5,9 @@ cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
 
 # Usage: ./scripts/load_fixtures
 
-docker-compose exec tph /app/server/manage.py puzzle_fixtures fixtures/puzzles
+error_message="Loading fixtures not successful. Is the container running?"
+
+docker-compose exec -T tph /app/server/manage.py puzzle_fixtures --fixtures-dir fixtures "$@" || echo $error_message
+docker-compose exec -T tph /app/server/manage.py puzzle_positions --fixtures-dir fixtures "$@" || echo $error_message
+
+docker-compose exec -T tph /app/server/manage.py setting_fixtures fixtures/settings "$@" || echo $error_message

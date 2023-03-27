@@ -1,0 +1,71 @@
+# Make sure to set these variables in Github:
+# - $DEPLOY_SSH_KEY_BASE64
+# - $DEPLOY_SSH_KNOWN_HOSTS
+# - Create a deploy token with name github-deploy-token
+
+name: refresh-assets-base
+
+env:
+  # FIXME: Change these to your own container registry
+  CI_REGISTRY: registry.gitlab.com
+  CI_REGISTRY_IMAGE: registry.gitlab.com/teammate/mh-2023/mh-2023
+
+on:
+  workflow_call:
+    inputs:
+      assert_branch:
+        type: string
+      assert_tag:
+        type: string
+      DEPLOY_USER:
+        type: string
+        required: true
+      DEPLOY_HOST:
+        type: string
+        required: true
+      DEPLOY_DIR:
+        type: string
+
+jobs:
+  refresh-assets:
+    name: Refresh assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch
+        if: >-
+          ${{
+            (inputs.assert_branch || inputs.assert_tag)
+            && github.ref != format('refs/heads/{0}', inputs.assert_branch)
+            && github.ref != format('refs/tags/{0}', inputs.assert_tag)
+          }}
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.setFailed( 'Branch must be ${{ inputs.assert_branch }}: ${{ github.ref_name }}' )
+      - name: Set env
+        run: |
+          export DEPLOY_USER=${{ inputs.DEPLOY_USER }}
+          export DEPLOY_HOST=${{ inputs.DEPLOY_HOST }}
+          export DEPLOY_DIR=${{ inputs.DEPLOY_DIR }}
+          export DEPLOY_DIR_DEFAULTED="${DEPLOY_DIR:-tph}"
+          # Export env to be reused in later steps. Like `env >> $GITHUB_ENV` but works with multiline values
+          env -0 | tr '\n' '\r' | tr '\0' '\n' | cut -s -d'=' -f1 | xargs -I{} sh -c 'printf "{}<<ENV_EOF\n%s\nENV_EOF\n" "${}"' >> $GITHUB_ENV
+      - name: Setup ssh
+        run: |
+          eval $(ssh-agent -s)
+          echo "${{ secrets.DEPLOY_SSH_KEY_BASE64 }}" | base64 -d | ssh-add -
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          # Export env to be reused in later steps. Like `env >> $GITHUB_ENV` but works with multiline values
+          env -0 | tr '\n' '\r' | tr '\0' '\n' | cut -s -d'=' -f1 | xargs -I{} sh -c 'printf "{}<<ENV_EOF\n%s\nENV_EOF\n" "${}"' >> $GITHUB_ENV
+          # ensure directory is set
+          [ -n "$DEPLOY_DIR_DEFAULTED" ] && [ -z "${DEPLOY_DIR_DEFAULTED//[^ ]/}" ]
+      - name: Refresh assets
+        run: |-
+          ssh $DEPLOY_USER@$DEPLOY_HOST 'bash -l <(cat) </dev/null' <<SSH
+          set -e
+          ~/$DEPLOY_DIR_DEFAULTED/scripts/sync_media --full ~/srv/
+          ~/$DEPLOY_DIR_DEFAULTED/refresh.sh hard
+          SSH
+          echo "### :rocket: Refreshed assets" >> $GITHUB_STEP_SUMMARY
+          echo "Refreshed assets on [$DEPLOY_HOST](https://$DEPLOY_HOST)" >> $GITHUB_STEP_SUMMARY

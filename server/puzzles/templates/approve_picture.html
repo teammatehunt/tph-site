@@ -7,7 +7,7 @@
 {% block content %}
 
 {% if picture %}
-    {{ team_name }}'s team photo.
+    {{ name }}'s team photo.
     <br />
     <img src="{{ picture }}" />
 
@@ -26,7 +26,7 @@
     {% endif %}
     </p>
 {% else %}
-    {{ team_name }} does not have a team photo.
+    {{ name }} does not have a team photo.
 {% endif %}
 
 {% endblock %}

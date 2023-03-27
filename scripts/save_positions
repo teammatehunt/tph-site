@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -e
+REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
+cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
+
+# Usage: ./scripts/save_fixtures
+
+echo "Are you sure you have all existing db changes? This will overwrite positions.csv in server/tph/fixtures/puzzles. [y/N]"
+read line
+if [[ $line == "y" ]]; then
+    mkdir -p server/tph/fixtures/puzzles
+    docker-compose exec tph /app/server/manage.py puzzle_positions --fixtures-dir fixtures --save "$@"
+
+else
+    echo "Stopping"
+    exit 1
+fi

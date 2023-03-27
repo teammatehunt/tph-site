@@ -1,24 +1,25 @@
 import React, { FunctionComponent, HTMLProps } from 'react';
+import { HIDDEN_CLASS } from 'components/copy';
 
 interface Props {
-  url: string;
+  src: string;
   ref?: React.RefObject<HTMLAudioElement>;
   sourceRef?: React.RefObject<HTMLSourceElement>;
 }
 
-/**
- * NOTE: currently webpack is broken and returns an invalid url server-side for music.
- * As a workaround, this component must be dynamically imported.
- * TODO: fix this in next.config.js instead of this hacky workaround.
- */
 const AudioLink: FunctionComponent<Props & HTMLProps<HTMLAudioElement>> = ({
-  url,
+  src,
   ref = undefined,
   ...props
 }) => (
-  <audio ref={ref} {...props}>
-    <source src={url ? require(`assets/${url}`).default : ''} />
-  </audio>
+  <>
+    <audio ref={ref} controls {...props}>
+      <source src={src} />
+    </audio>
+    <div className={HIDDEN_CLASS}>
+      <a href={src}>[Audio link]</a>
+    </div>
+  </>
 );
 
 export default AudioLink;

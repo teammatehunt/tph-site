@@ -1,50 +1,78 @@
 import React, {
-  FunctionComponent,
+  FC,
+  RefObject,
   useContext,
   useMemo,
   useEffect,
+  useRef,
   useState,
   useCallback,
 } from 'react';
 import parse from 'html-react-parser';
-import { Router, useRouter } from 'next/router';
+import { Router } from 'next/router';
+import { useRouter } from 'utils/router';
 import Head from 'next/head';
-import Link from 'next/link';
+import Link from 'components/link';
 import cx from 'classnames';
+import dynamic from 'next/dynamic';
+import useCookie from 'react-use-cookie';
 
-import PuzzleTitle from 'components/puzzle_title';
+import Accordion from 'components/accordion';
+import CopyToClipboard, { CopyConfig } from 'components/copy';
+import GuessBox, { Guess } from 'components/puzzle/guess_box';
 import HuntInfoContext, { Errata } from 'components/context';
-import InfoIcon from 'components/info_icon';
+import InteractionForm, { Interaction } from 'components/interaction_form';
+import PuzzleTitle from 'components/puzzle_title';
 import Section from 'components/section';
+import { Story } from 'components/storycard';
 import { Countdown } from 'components/countdown';
 import { DjangoFormErrors } from 'types';
-import { clientFetch, serverFetch, useEventWebSocket } from 'utils/fetch';
+import {
+  clientFetch,
+  CryptKeys,
+  serverFetch,
+  useEventWebSocket,
+} from 'utils/fetch';
+import Table from 'components/table';
 import { formattedDateTime } from 'utils/timer';
-import StoryNotifications from 'components/story_notifications';
-import LinkIfStatic from 'components/link';
+import { LinkIfStatic } from 'components/link';
+import { UnsupportedMessage } from 'components/unsupported';
+import { useSessionUuid } from 'utils/uuid';
+import WorkerLoadingIcon from 'components/worker_loading_icon';
+
+const POSTHUNT_NEEDS_WORKER_PUZZLES: string[] = [];
 
 const answerize = (s: string) => {
   return s ? s.toUpperCase().replace(/[^A-Z]/g, '') : '';
 };
 
-export interface Guess {
-  timestamp: string;
-  guess: string;
-  response: string;
-  isCorrect?: boolean;
+export interface RoundData {
+  act: number;
+  slug: string;
+  name: string;
+  url: string;
+  wordmark?: string;
+  header?: string;
+  background?: string;
+  favicon?: string;
+  private?: any; // Custom puzzle-specific data.
 }
 
 export interface RateLimitData {
-  guessCount: number;
   shouldLimit: boolean;
-  secondsToWait?: number;
-  guessesLeft: number;
-  grantUnderReview: boolean;
+  secondsToWait: number;
+}
+
+export interface CannedHint {
+  keywords: string;
+  content: string;
 }
 
 export interface PuzzleData {
+  statusCode?: number;
   name: string;
   slug: string;
+  url: string;
   isSolved?: boolean;
   guesses?: Guess[];
   solutionLinkVisible?: boolean;
@@ -53,14 +81,16 @@ export interface PuzzleData {
   rateLimit?: RateLimitData;
   canViewHints?: boolean;
   canAskForHints?: boolean;
+  hintReason?: string;
+  hintsUrl?: string;
   errata?: Errata[];
+  cannedB64Encoded?: string;
   answerB64Encoded?: string;
   partialMessagesB64Encoded?: [string, string][];
-  puzzleUrl?: string;
-  round?: string;
-  endcapUrl?: string;
-  storyUrl?: string;
-  endcapSlug?: string;
+  puzzleUrl?: string; // External url for testsolving only.
+  round?: RoundData;
+  storycard?: Story;
+  interaction?: Interaction;
   private?: any; // Custom puzzle-specific data.
 }
 
@@ -72,100 +102,153 @@ interface SolveResponse {
   form_errors?: DjangoFormErrors<AnswerForm>;
   guesses?: Guess[];
   ratelimit_data?: RateLimitData;
+  interaction?: Interaction;
+  private?: any; // Custom puzzle-specific data.
 }
 
-interface MoreGuessResponse {
-  granted: boolean;
-}
-
-interface Props {
+export interface PuzzleProps {
   titleHtml?: React.ReactFragment;
   nameOverride?: string;
   puzzleData: PuzzleData;
+  copyData?: { ref: RefObject<HTMLElement>; config?: CopyConfig };
   showTitle?: boolean;
   smallTitle?: boolean;
+  showSubmission?: boolean | string;
   maxWidth?: boolean;
   maxWidthPx?: number;
+  dark?: boolean;
+  bgUrl?: string;
+  Input?: FC<React.HTMLProps<HTMLInputElement>>;
+  localChecker?: string;
+}
+
+export interface PuzzleDataProps {
+  puzzleData: PuzzleData;
 }
 
 interface LinkData {
   href: string;
   text: string;
+  shallow?: boolean;
 }
 
-function getCountdown(secondsToWait, setError, setSecondsToWait) {
-  const countdownCallback = function () {
-    // Cleanup errors tied to rate limit.
-    setError('');
-    setSecondsToWait(0);
-  };
+function getCountdown(secondsToWait, onFinish) {
   return (
     <Countdown
       seconds={secondsToWait}
-      textOnCountdownFinish=""
-      countdownFinishCallback={countdownCallback}
+      countdownFinishCallback={onFinish}
       showHours
     />
   );
 }
 
-const getEndcapUrl = (puzzleData: PuzzleData) => puzzleData.endcapUrl;
+export const RoundHeader: FC<{ round: RoundData }> = ({ round }) => (
+  <div className="round-header flex items-center justify-center print:hidden">
+    {round.header && (
+      <img
+        className="absolute w-full inset-x-0 top-0 pointer-events-none"
+        src={round.header}
+        alt={round.name}
+      />
+    )}
+    <a className="md:w-1/3 w-2/3 z-[1]" href={round.url}>
+      <img className="w-full" src={round.wordmark} alt="Back to round" />
+    </a>
+  </div>
+);
 
 /**
  * Wrapper component for all puzzles with logic for submissions, as well as
  * displaying past guesses.
  */
-const Puzzle: FunctionComponent<Props> = ({
+const Puzzle: FC<PuzzleProps> = ({
   titleHtml,
   puzzleData,
   nameOverride,
+  copyData = undefined,
   showTitle = true,
   smallTitle = false,
+  showSubmission = true,
   maxWidth = true,
   maxWidthPx = 900,
+  Input = 'input',
+  dark = false,
+  bgUrl = undefined,
+  localChecker = undefined,
   children,
 }) => {
   const router = useRouter();
   const { userInfo, huntInfo } = useContext(HuntInfoContext);
+
+  const copyButtonRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const uuid = useSessionUuid();
+  const darkMode = dark;
+
   const [error, setError] = useState<any>('');
   const [guesses, setGuesses] = useState<Guess[]>(puzzleData.guesses ?? []);
+  const [guessesVisible, setGuessesVisible] = useState<boolean>(true);
   const [isSolved, setSolved] = useState<boolean>(puzzleData.isSolved ?? false);
 
   const [isSubmitting, setSubmitting] = useState<boolean>(false);
+  const [isInputDisabled, setInputDisabled] = useState<boolean>(false);
+
   const [secondsToWait, setSecondsToWait] = useState<number>(
     puzzleData.rateLimit?.secondsToWait ?? 0
   );
   const [isRateLimited, setRateLimited] = useState<boolean | undefined>(
     puzzleData.rateLimit?.shouldLimit
   );
-  // For static version, start this at 20 instead of using puzzleData.
-  const [guessesLeft, setGuessesLeft] = useState<number>(
-    process.env.isStatic ? 20 : puzzleData.rateLimit?.guessesLeft ?? 20
-  );
-  // Only used in static version.
-  const [totalGuesses, setTotalGuesses] = useState<number>(20);
-  const [moreGuessesPending, setMoreGuessesPending] = useState<
-    boolean | undefined
-  >(puzzleData.rateLimit?.grantUnderReview);
+  const [rateLimitError, setRateLimitError] = useState<any>('');
   const [errata, setErrata] = useState<Errata[]>(puzzleData.errata ?? []);
+  const [cannedHints, setCannedHints] = useState<CannedHint[]>(
+    puzzleData.cannedB64Encoded
+      ? JSON.parse(atob(puzzleData.cannedB64Encoded))
+      : []
+  );
+  const [storycard, setStorycard] = useState<Story | undefined>(
+    puzzleData.storycard
+  );
+  const [interaction, setInteraction] = useState<Interaction | undefined>(
+    puzzleData.interaction
+  );
 
   const slug = puzzleData.slug;
   const huntIsOver = huntInfo && new Date() > new Date(huntInfo.endTime);
   const loggedIn = !!userInfo?.teamInfo;
+  const reallyShowSubmission =
+    showSubmission === 'public' ? userInfo?.public : showSubmission;
 
   /* Websocket handler which syncs guesses, rate limits, etc. with the rest of
   /* the team. */
-  const websocketHandler = useCallback((message) => {
-    if (message?.data?.puzzle?.slug === puzzleData.slug) {
-      if (message?.data?.guess) {
-        setGuesses((guesses) => [message.data.guess, ...guesses]);
-        if (message?.data?.guess?.isCorrect) setSolved(true);
+  const websocketHandler = useCallback((message = {}) => {
+    if (message.data?.puzzle?.slug === puzzleData.slug) {
+      const storycard = message.data?.storycard;
+      if (storycard) {
+        setStorycard(storycard);
+        if (storycard.url) {
+          // Navigate to url directly on solve
+          // Hack: wait a second so they see the solve animation
+          setTimeout(() => router.push(storycard.url), 1000);
+        }
       }
-      if (message?.data?.rateLimit) {
-        setSecondsToWait(message?.data?.rateLimit?.secondsToWait);
-        setRateLimited(message?.data?.rateLimit?.shouldLimit);
-        setGuessesLeft(message?.data?.rateLimit?.guessesLeft);
-        setMoreGuessesPending(message?.data?.rateLimit?.grantUnderReview);
+      if (message.data?.guess) {
+        setGuesses((guesses) => {
+          // Make sure that we only update if the guess isn't already in the list.
+          if (
+            guesses.some((guess) => guess.guess === message.data.guess.guess)
+          ) {
+            return guesses;
+          }
+
+          // Otherwise, prepend to the list.
+          return [message.data.guess, ...guesses];
+        });
+        if (message.data.guess.isCorrect) setSolved(true);
+      }
+      if (message.data?.rateLimit) {
+        setSecondsToWait(message.data.rateLimit.secondsToWait);
+        setRateLimited(message.data.rateLimit.shouldLimit);
       }
     }
   }, []);
@@ -177,32 +260,35 @@ const Puzzle: FunctionComponent<Props> = ({
   useEffect(() => {
     setGuesses(puzzleData.guesses ?? []);
     setSolved(puzzleData.isSolved ?? false);
-  }, [puzzleData]);
+  }, [puzzleData.guesses, puzzleData.isSolved]);
 
   useEffect(() => {
     if (secondsToWait > 0) {
-      const timer = getCountdown(secondsToWait, setError, setSecondsToWait);
+      const timer = getCountdown(
+        secondsToWait,
+        () => void setSecondsToWait(0) // reset on finish
+      );
       const error = (
         <>
-          <span>
-            You've submitted too many guesses. Your next guess will be available
-            in:
-          </span>{' '}
+          <span>Your next guess will be available in:</span>{' '}
           <strong>{timer}</strong>
         </>
       );
-      setError(error);
+      setRateLimitError(error);
     } else {
-      setError('');
+      setRateLimitError('');
+      setRateLimited(false);
     }
   }, [secondsToWait]);
+
+  const hintsUrl = puzzleData?.hintsUrl;
 
   /* Shows the hint, solution, and stats links if unlocked. */
   const getTopRightLinks = useMemo((): LinkData[] => {
     const topRightLinks: LinkData[] = [];
-    if (puzzleData?.canViewHints) {
+    if (hintsUrl) {
       topRightLinks.push({
-        href: `/hints/${slug}`,
+        href: hintsUrl,
         text: 'Request a hint',
       });
     }
@@ -216,8 +302,14 @@ const Puzzle: FunctionComponent<Props> = ({
         text: 'View stats',
       });
     }
+    if (storycard && storycard.url) {
+      topRightLinks.push({
+        href: storycard.url,
+        text: 'View story',
+      });
+    }
     return topRightLinks;
-  }, [guesses, puzzleData]);
+  }, [guesses, puzzleData?.solutionLinkVisible, storycard, hintsUrl]);
 
   /* In static mode (or post-hunt) this is used to check answers against a
    * base64 encoded answer. */
@@ -225,7 +317,7 @@ const Puzzle: FunctionComponent<Props> = ({
     e.preventDefault();
     const data = new FormData(e.target);
     e.target.reset(); // Clear the form input
-    const guess = answerize(data.get('answer') as string);
+    const guess: string = answerize(data.get('answer') as string);
     if (!guess) {
       setError(
         'All puzzle answers will have at least one letter A through Z \
@@ -242,11 +334,14 @@ const Puzzle: FunctionComponent<Props> = ({
     }
     setError(''); // clear previous errors
     if (isRateLimited) {
-      setError(
-        "You've submitted too many guesses. You may request more guesses with the button below."
+      setRateLimitError(
+        "You've submitted too many guesses. Please wait before trying again."
       );
     } else {
-      const guessB64Encoded = btoa(guess);
+      // TextEncoder needed for non-ASCII
+      const guessB64Encoded = btoa(
+        String.fromCharCode(...new TextEncoder().encode(guess))
+      );
       const isCorrect = guessB64Encoded === puzzleData.answerB64Encoded;
       let newGuesses = [...guesses];
       let response = isCorrect ? 'Correct!' : 'Incorrect';
@@ -266,31 +361,16 @@ const Puzzle: FunctionComponent<Props> = ({
         isCorrect: isCorrect,
       });
       setGuesses(newGuesses);
-      setGuessesLeft(totalGuesses - newGuesses.length);
       if (isCorrect) {
         setSolved(true);
-      } else if (totalGuesses - newGuesses.length <= 0) {
-        setRateLimited(true);
-        setError(
-          "You've submitted too many guesses. You may request more guesses with the button below."
-        );
       }
     }
-  };
-
-  const moreGuessOnSubmitLocal = async (e) => {
-    e.preventDefault();
-    e.target.reset(); // Clear the form input
-
-    setRateLimited(false);
-    setTotalGuesses(totalGuesses + 20);
-    setGuessesLeft(totalGuesses - guesses.length + 20);
-    setError('');
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
     const data = new FormData(e.target);
+    data.append('uuid', uuid);
     e.target.reset(); // Clear the form input
 
     setSubmitting(true);
@@ -307,9 +387,8 @@ const Puzzle: FunctionComponent<Props> = ({
     const rateLimitedBefore = isRateLimited;
     if (response.ratelimit_data) {
       setRateLimited(response.ratelimit_data.shouldLimit);
-      setGuessesLeft(response.ratelimit_data.guessesLeft);
     }
-    if (response?.guesses) {
+    if (response.guesses) {
       // A successful guess happened.
       const newGuesses = response.guesses;
       setGuesses(newGuesses);
@@ -317,66 +396,25 @@ const Puzzle: FunctionComponent<Props> = ({
         setSolved(true);
       }
     }
-    if (response?.ratelimit_data?.shouldLimit) {
+    if (response.ratelimit_data?.shouldLimit) {
       // We were already rate limited and tried to make a guess.
       // Do not update the error message, even if an error is defined, because
       // doing so overwrites the countdown.
-    } else if (response?.form_errors) {
+    } else if (response.form_errors) {
       // We were not rate limited but our answer submit was bad for some reason.
       setError(response.form_errors.answer || response.form_errors.__all__!);
     } else {
-      setError(''); // wipe errors from previous guess
+      // wipe errors from previous guess
+      setError('');
+      setRateLimitError('');
     }
-    if (response?.ratelimit_data?.shouldLimit) {
-      // Always turn on request button on final guess even if a request is
-      // pending.
-      if (!rateLimitedBefore) {
-        setMoreGuessesPending(false);
-      }
-      // Is always defined, this is just so Typescript knows.
-      if (response?.ratelimit_data?.secondsToWait !== undefined) {
-        setSecondsToWait(response.ratelimit_data.secondsToWait);
-      }
+    if (response.ratelimit_data?.shouldLimit) {
+      setSecondsToWait(response.ratelimit_data.secondsToWait);
+    }
+    if (response.interaction) {
+      setInteraction(interaction);
     }
   };
-
-  const moreGuessOnSubmit = async (e) => {
-    e.preventDefault();
-    e.target.reset(); // Clear the form input
-
-    const response = await clientFetch<MoreGuessResponse>(
-      router,
-      `/puzzle/${slug}/moreguesses`,
-      { method: 'POST', body: {} }
-    );
-    setMoreGuessesPending(!response.granted);
-  };
-
-  const topRightElement = (
-    <span>
-      <h3 className="small-caps">
-        {getTopRightLinks.map(({ href, text }, i) => (
-          <LinkIfStatic key={`topright-${i}`} href={href} className="secondary">
-            {text}
-          </LinkIfStatic>
-        ))}
-      </h3>
-      <style jsx>{`
-        span {
-          margin-left: auto;
-        }
-        h3 {
-          display: flex;
-          flex-wrap: wrap;
-          font-size: 16px;
-          margin: 0;
-        }
-        h3 :global(a) {
-          padding: 0 0 0 16px;
-        }
-      `}</style>
-    </span>
-  );
 
   const displayedErrata = useMemo(
     () => (
@@ -384,21 +422,25 @@ const Puzzle: FunctionComponent<Props> = ({
         {errata.map((err, i) => (
           <p className="error" key={`errata-${i}`}>
             <b>Erratum</b> on{' '}
-            {err.formattedTime ??
-              formattedDateTime(err.time, {
-                month: 'numeric',
-                year: '2-digit',
-                second: undefined,
-              })}
-            : {parse(err.text)}
+            {formattedDateTime(err.time, {
+              month: 'numeric',
+              year: '2-digit',
+              second: undefined,
+            })}
+            :{' '}
+            {err.text.startsWith('Hint') ? (
+              <>
+                Hint: <span className="spoiler">{parse(err.text)}</span>
+              </>
+            ) : (
+              parse(err.text)
+            )}
           </p>
         ))}
 
         <style jsx>{`
           .errata {
             margin: 0 auto;
-            width: 80vw;
-            max-width: 900px;
           }
         `}</style>
       </div>
@@ -406,169 +448,179 @@ const Puzzle: FunctionComponent<Props> = ({
     [errata]
   );
 
+  const displayedCannedHints = useMemo(
+    () => (
+      <Accordion heading="Show canned hints">
+        <p>Hints reveal on hover.</p>
+        <Table>
+          <thead>
+            <tr>
+              <th>Keywords</th>
+              <th>Hint</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cannedHints.map((hint, i) => (
+              <tr key={`canned-${i}`}>
+                <td className="spoiler">{hint.keywords}</td>
+                <td className="spoiler">{hint.content}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Accordion>
+    ),
+    [cannedHints]
+  );
+
+  const puzzleTitle = nameOverride ?? puzzleData.name;
+
   return (
-    <div className={cx('container', { maxWidth })}>
-      {showTitle && (
-        <Head>
-          <title>{nameOverride ?? puzzleData.name}</title>
-        </Head>
-      )}
-
-      <StoryNotifications onlyFinished />
-
-      <div className="top-right flex-center-vert">{topRightElement}</div>
-      <div className="puzzle-title-container flex-center-vert">
-        {titleHtml || (
-          <PuzzleTitle
-            title={nameOverride ?? puzzleData.name}
-            small={smallTitle}
+    <div
+      className={cx('puzzle container', {
+        maxWidth,
+        darkmode: darkMode,
+      })}
+    >
+      <Head>
+        {puzzleData.round?.favicon && (
+          <link
+            key="favicon"
+            rel="shortcut icon"
+            href={puzzleData.round.favicon}
+            type="image/vnd.microsoft.icon"
           />
         )}
+        {showTitle && <title>{puzzleTitle}</title>}
+      </Head>
+      <div className="top-right flex flex-wrap justify-end space-x-2 print:hidden">
+        {getTopRightLinks.map(({ href, text, shallow = false }, i) => (
+          <Link key={`topright-${i}`} href={href} shallow={shallow}>
+            <a className="bg-navbar p-1.5 rounded-lg secondary">{text}</a>
+          </Link>
+        ))}
       </div>
-
-      {errata?.length > 0 && displayedErrata}
-      {!loggedIn && !huntIsOver ? (
-        <div className="not-logged-in flex-center-vert">
-          <InfoIcon>
-            <em>
-              You're currently not logged in! Feel free to look at the puzzle,
-              but you'll need to sign up to check answers and progress through
-              the hunt.
-            </em>
-          </InfoIcon>
-        </div>
-      ) : (
-        <div className="guesses flex-center-vert">
-          {!isSolved && (
-            <div className="guess-box submission">
+      {puzzleData.round?.wordmark && <RoundHeader round={puzzleData.round} />}
+      <div className="flex items-center justify-center">
+        {titleHtml || <PuzzleTitle title={puzzleTitle} small={smallTitle} />}
+      </div>
+      {guessesVisible && (
+        <div
+          className={cx(
+            'ui-wrapper mt-[0.6rem] mx-auto flex flex-col items-center justify-center'
+          )}
+        >
+          {!isSolved && reallyShowSubmission && (
+            <div className="guess-box flex flex-col justify-center text-center drop-shadow-md">
               <form
                 onSubmit={
-                  process.env.isStatic || (huntIsOver && !loggedIn)
+                  localChecker !== 'none' &&
+                  (process.env.isArchive || (huntIsOver && !loggedIn))
                     ? onSubmitLocalChecker
                     : onSubmit
                 }
               >
-                <label
-                  className="guess-header flex-center-vert"
-                  htmlFor="answer"
-                >
-                  <h4 className="secondary small-caps">Submit a guess</h4>
-                  <span>
-                    <em>
-                      {guessesLeft} guess
-                      {guessesLeft !== 1 && 'es'} available
-                    </em>
-                  </span>
+                <label className="flex items-center pb-2" htmlFor="answer">
+                  <h4>
+                    {userInfo?.public ? 'Check answer' : 'Submit a guess'}
+                  </h4>
                 </label>
-                <div className="inputs">
-                  <input
-                    className="monospace"
+                <div className="inputs flex relative justify-center w-full">
+                  <Input
+                    ref={inputRef}
+                    className="font-mono grow shrink-0 basis-80 px-3 py-2"
                     name="answer"
                     id="answer"
                     disabled={isSubmitting}
                     type="text"
                   />
                   <input
-                    className="small-caps"
+                    className="ui-button font-smallcaps font-bold basis-24"
+                    id="submit-button"
                     type="submit"
-                    disabled={isSubmitting || guessesLeft === 0}
+                    disabled={isSubmitting || isRateLimited}
                     value={isSubmitting ? 'Submitting' : 'Submit'}
                   />
                 </div>
-                {error && <p className="error">{error}</p>}
-              </form>
-              <form
-                className="moreguesses"
-                onSubmit={
-                  process.env.isStatic || (huntIsOver && !loggedIn)
-                    ? moreGuessOnSubmitLocal
-                    : moreGuessOnSubmit
-                }
-              >
-                {isRateLimited && (
-                  <input
-                    className="small-caps"
-                    type="submit"
-                    disabled={moreGuessesPending}
-                    value={
-                      moreGuessesPending
-                        ? 'Request for more guesses pending approval'
-                        : 'Request more guesses'
-                    }
-                  />
+                {rateLimitError ? (
+                  <p className="error">{rateLimitError}</p>
+                ) : (
+                  error && <p className="error">{error}</p>
                 )}
               </form>
             </div>
           )}
-          {guesses.length > 0 && (
-            <div className="guess-box log">
-              <table className="center">
-                <thead>
-                  <tr>
-                    <th className="small-caps">Guesses</th>
-                    <th className="small-caps">Response</th>
-                    <th className="small-caps">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {guesses.map(
-                    ({ timestamp, guess, response, isCorrect }, i) => (
-                      <tr key={i} className={isCorrect ? 'correct' : ''}>
-                        <td
-                          className={`guess monospace ${
-                            guess.length >= 16 ? 'small' : ''
-                          }`}
-                        >
-                          {guess}
-                        </td>
-                        <td>{parse(response)}</td>
-                        <td suppressHydrationWarning>
-                          {formattedDateTime(timestamp, {
-                            month: 'numeric',
-                            year: '2-digit',
-                            second: 'numeric',
-                          })}
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <GuessBox className="guess-box" guesses={guesses} />
         </div>
       )}
-
-      <Section>
+      <Section
+        className={cx(
+          'puzzle-container min-h-[50vh] max-h-full transition-height duration-1000 relative',
+          {
+            'bg-white after:bg-white after:drop-shadow-md rounded-md after:rounded-md':
+              !darkMode,
+            'bg-img': !!bgUrl,
+          }
+        )}
+      >
+        {cannedHints?.length > 0 && displayedCannedHints}
+        {errata?.length > 0 && displayedErrata}
+        {interaction && !isSolved && <InteractionForm {...interaction} />}
+        {process.env.useWorker &&
+          POSTHUNT_NEEDS_WORKER_PUZZLES.includes(slug) && <WorkerLoadingIcon />}
         {
           /* Pass guesses to child if render is a function. */
           typeof children === 'function' ? children(guesses) : children
         }
+        {copyData && (
+          <CopyToClipboard
+            textRef={copyData.ref}
+            selfRef={copyButtonRef}
+            config={copyData.config}
+          />
+        )}
       </Section>
-
-      {getEndcapUrl(puzzleData) && (
-        <Section center>
-          <Link
-            href={`/story${
-              puzzleData.endcapSlug ? `#${puzzleData.endcapSlug}` : ''
-            }`}
-          >
-            <a>
-              <img className="endcap" src={getEndcapUrl(puzzleData)} />
-            </a>
-          </Link>
-        </Section>
-      )}
-
       <style jsx>{`
-        .container {
-          padding-bottom: 40px;
-          margin: 0 auto;
+        :global(#__next) {
+          background-image: ${puzzleData.round?.background
+            ? `url(${puzzleData.round.background}) !important`
+            : 'inherit'};
+        }
+
+        .puzzle.container {
+          padding-bottom: 0;
         }
 
         .container.maxWidth,
         .container.maxWidth :global(section) {
           max-width: ${maxWidthPx}px;
+        }
+
+        :global(.puzzle-container.bg-img) {
+          background-image: ${bgUrl ? `url(${bgUrl})` : 'inherit'};
+          background-size: ${bgUrl ? 'cover' : 'inherit'};
+          background-repeat: ${bgUrl ? 'repeat-y' : 'inherit'};
+        }
+      `}</style>
+      <style jsx>{`
+        /* Set drop-shadow on :after to avoid messing with position fixed */
+        :global(.puzzle-container):after {
+          content: ' ';
+          position: absolute;
+          left: 0;
+          top: 0;
+          height: 100%;
+          width: 100%;
+          z-index: -1;
+        }
+
+        :global(.darkmode .puzzle-container),
+        :global(.darkmode .puzzle-container):after {
+          border: none;
+        }
+
+        .container {
+          margin: 0 auto;
         }
 
         .not-logged-in {
@@ -582,117 +634,42 @@ const Puzzle: FunctionComponent<Props> = ({
         }
 
         .top-right {
+          position: relative;
+          z-index: 1;
+          padding: 16px 0 8px;
           max-width: 80vw;
         }
 
-        .puzzle-title-container {
-          margin: 0 0 16px 0;
-          filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.25));
-        }
-
-        :global(.darkmode) .puzzle-title-container {
-          filter: drop-shadow(2px 2px 0 rgba(222, 197, 125, 0.25));
-        }
-
-        .guesses {
-          flex-direction: column;
-        }
-
-        .guess-header {
-          justify-content: space-between;
-          padding-bottom: 8px;
-        }
-
-        .guess-box {
-          margin-bottom: 50px;
-          max-height: 240px;
-          width: 80vw;
+        :global(.ui-wrapper) {
           max-width: 900px;
         }
 
-        h4 {
-          margin: 0;
-        }
-
-        .submission {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          text-align: center;
-        }
-
-        .log {
-          border: 1px solid var(--text);
-          overflow-y: auto;
-          padding: 8px 12px;
-        }
-
-        .log table th {
-          color: var(--muted);
-        }
-
-        table {
-          margin: 8px 0;
+        :global(.guess-box) {
+          background: white;
+          border-radius: 4px;
+          margin-bottom: 50px;
+          padding: 20px;
           width: 100%;
         }
 
-        .guess {
-          font-size: 20px;
-          white-space: normal;
-          word-wrap: break-word;
-          word-break: break-all;
-          text-overflow: clip;
-        }
-
-        .guess.small {
-          font-size: 16px;
-        }
-
-        td {
-          padding: 4px 8px;
-        }
-
-        .correct {
-          font-weight: bold;
-          color: var(--primary);
-        }
-
-        form.moreguesses {
-          margin-top: 0px;
-          display: flex;
-          justify-content: center;
-        }
-
-        form > div {
-          display: flex;
-        }
-
-        .inputs {
-          display: flex;
-          justify-content: center;
-          width: 100%;
+        :global(.darkmode .guess-box) {
+          background: transparent;
+          border: 1px solid white;
         }
 
         input {
           font-size: 16px;
-          padding: 8px 12px;
-          width: 100%;
-          flex: 1 0 300px;
         }
 
         input[type='submit'] {
-          font-weight: bold;
           font-size: 18px;
-          flex: 0 1 100px;
-        }
-
-        .endcap {
-          margin-top: 24px;
-          margin-left: -15%;
-          width: 130%;
         }
 
         @media (max-width: 800px) {
+          :global(.guess-box) {
+            width: 95vw;
+          }
+
           .top-right {
             max-width: 100vw;
           }
@@ -706,6 +683,26 @@ const Puzzle: FunctionComponent<Props> = ({
             max-width: 80%;
           }
         }
+
+        @media print {
+          :global(.guess-box) {
+            display: none;
+          }
+
+          .container {
+            max-width: 100%;
+          }
+
+          .container.maxWidth :global(.puzzle-container),
+          :global(.puzzle-container) {
+            width: 100% !important;
+            max-width: 100%;
+          }
+
+          :global(.puzzle-container):after {
+            display: none;
+          }
+        }
       `}</style>
     </div>
   );
@@ -713,23 +710,71 @@ const Puzzle: FunctionComponent<Props> = ({
 
 export default Puzzle;
 
-/* Returns a prop getter for a particular puzzle. */
-export const getPuzzleProps = (slug: string) => async (context) => {
-  let puzzleData: PuzzleData;
-  if (process.env.isStatic) {
-    // Returns a static response for the puzzle data.
-    puzzleData = require(`assets/json_responses/puzzles/${slug}.json`);
-  } else {
-    // Fetches data from the server.
-    puzzleData = await serverFetch<PuzzleData>(context, `/puzzle/${slug}`);
-  }
+interface PuzzleOptions {
+  bare?: boolean;
+  solution?: boolean;
+}
 
-  return {
-    props: {
+interface PuzzleDataServerResponse extends PuzzleData {
+  redirect?: string;
+}
+interface PuzzleDataResponseProps {
+  puzzleData: PuzzleData;
+  bare?: boolean;
+  cryptKeys?: CryptKeys;
+}
+
+/* Returns a prop getter for a particular puzzle. */
+export const getPuzzleProps =
+  (slug: string, options: PuzzleOptions = {}) =>
+  async (context) => {
+    const { bare = false } = options;
+    let puzzleData: PuzzleDataServerResponse;
+    if (process.env.isStatic) {
+      // Returns a static response for the puzzle data.
+      puzzleData = require(`assets/json_responses/puzzles/${slug}.json`);
+    } else {
+      // Fetches data from the server.
+      puzzleData = await serverFetch<PuzzleDataServerResponse>(
+        context,
+        `/puzzle/${slug}${options.solution ? '?s=1' : ''}`
+      );
+    }
+
+    // Check that the puzzle is accessible
+    if (puzzleData.statusCode === 404) {
+      return {
+        props: {
+          statusCode: puzzleData.statusCode,
+          puzzleData: null,
+        },
+      };
+    } else if (puzzleData.statusCode === 302) {
+      let destination: string = puzzleData.redirect!;
+      if (destination.startsWith(process.env.basePath!)) {
+        destination = destination.slice(process.env.basePath!.length);
+      }
+      return {
+        redirect: {
+          destination,
+          permanent: false,
+        },
+      };
+    }
+
+    const props: PuzzleDataResponseProps = {
       puzzleData,
-    },
+      bare,
+    };
+    // If cryptKeys exist for the puzzle, move it to the root level.
+    const cryptKeys = puzzleData.private?.cryptKeys;
+    if (cryptKeys) {
+      props.cryptKeys = cryptKeys;
+      delete puzzleData.private.cryptKeys;
+    }
+
+    return { props };
   };
-};
 
 export const getClientPuzzleProps = async (router, slug: string) => {
   const puzzleData = await clientFetch<PuzzleData>(router, `/puzzle/${slug}`);

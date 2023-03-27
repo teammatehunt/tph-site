@@ -1,13 +1,13 @@
-import json
+from spoilr.utils import json
 import random
 import secrets
 from datetime import timedelta
 
 from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.models import User
 from django.http import Http404, HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from spoilr.core.models import User
 
 from .forms import *
 from .models import Token

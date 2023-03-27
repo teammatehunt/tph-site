@@ -150,11 +150,10 @@ have also used Redis for high-performance caching.
   `migrate`/`makemigrations`, and `runserver`. There are also custom commands,
   defined in `puzzles/management/commands`.
 - `README.md`: You're reading me.
-- `requirements.txt`: A file that `pip` can read to install the Python packages
-  needed by the server. If you want to add one, put it in the file. Locally,
-  you'll need to run `pip install -r requirements.txt` to pick it up (inside the
-  virtualenv if you're using one). The production server will pick it up when it
-  next gets deployed.
+- `poetry/`: Poetry config files specifying requirements needed by the server.
+  If you want to add one, put it in `poetry/pyproject.toml` and you will need
+  Poetry (and Python 3.9) locally to run `poetry lock --no-update`. Docker
+  will use these files the next time it builds.
 - `tph/`: A catch-all for various configuration.
   - `asgi.py`: Boilerplate for hooking Django up to a web server in production.
   - `settings/`: Here are a few sets of Django settings depending on
@@ -189,20 +188,18 @@ This directory contains all of the business logic for the site.
 - `messaging.py`: Functions for sending email and Discord messages.
 - `models.py`: Defines database objects.
   - `Puzzle`: A puzzle.
-  - `Team`: A team corresponds to a Django user, since it has a single login,
-    but a team can list multiple names and emails. TeamMember objects are
-    essentially just for display and email purposes.
-  - `PuzzleUnlock`: Represents a team having access to a puzzle. Since this
+  - `Team`: A team corresponds to a Django user, since it has a single login.
+  - `PuzzleAccess`: Represents a team having access to a puzzle. Since this
     needs to be recalculated all the time anyway as teams progress, it's not
     that useful as a caching mechanism. It mostly allows analysis and statistics
     of when exactly unlocks happened.
-  - `PuzzleMessage`: A keep-going message displayed when submitting a specific
-    wrong answer.
-  - `AnswerSubmission`: A guess by a team on a puzzle, either right or wrong.
+  - `PsuedoAnswer`: A keep-going message displayed when submitting a specific
+    wrong answer. See Spoilr.
+  - `PuzzleSubmission`: A guess by a team on a puzzle, either right or wrong.
   - `Hint`: A hint request initiated by a team. Has special listeners to send
     email and Discord messages when one is received or answered.
   - `StoryCard`: Represents a single unit of story text displayed to teams.
-  - `StoryCardUnlock`: Like `PuzzleUnlock` objects, represents a team's access
+  - `StoryCardAccess`: Like `PuzzleAccess` objects, represents a team's access
     to a story card.
   - `Errata`: Captures an erratum message and timestamp to display dynamically
     on the puzzle page.

@@ -7,6 +7,8 @@ if __name__ == "__main__":
     os.environ.setdefault(
         "DJANGO_SETTINGS_MODULE", f"tph.settings.{server_environment}"
     )
+    # manage commands do not need large puzzle dependencies
+    os.environ["SKIP_LARGE_DEPENDENCIES"] = "1"
     try:
         from django.core.management import execute_from_command_line
     except ImportError:

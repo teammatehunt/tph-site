@@ -1,0 +1,81 @@
+{% extends "spoilr/hints/layout.tmpl" %}
+{% load static %}
+
+{% block title %}Canned Hints for {{ puzzle.name|safe }} | {{ block.super }}{% endblock %}
+
+{% block stylesheets %}
+<style>
+html, body {
+  background: #fffaec;
+  min-width: 0;
+  height: auto;
+  font-family: "DM Sans", sans-serif;
+}
+
+.content {
+  text-align: center;
+}
+
+.puzzle-title-header {
+  font-size: 16px;
+  padding: 0;
+  margin: 0 0 1em 0;
+}
+
+th, td {
+  font-size: 14px;
+  text-align: left;
+  line-height: 1.3;
+}
+
+td p:first-child {
+  margin-top: 0;
+}
+
+td p:last-child {
+  margin-bottom: 0;
+}
+</style>
+{% endblock stylesheets %}
+
+{% block scripts %}
+<script src="{% static 'spoilr/hints/hint.js' %}"></script>
+{% endblock scripts %}
+
+{% block content %}
+<main>
+  <header>
+    <p class="puzzle-title-header">Canned Hints for <b>{{ puzzle.name }}</b></p>
+  </header>
+
+  <p>
+    <a href="{% url 'admin:spoilr_hints_cannedhint_changelist' %}?puzzle__id__exact={{ puzzle.id }}">View</a> or
+    <a href="{% url 'admin:spoilr_hints_cannedhint_add' %}?puzzle={{ puzzle.id }}">add</a> canned hints for this puzzle
+  </p>
+
+  <section id="main-content" class="content">
+    {% if canned_hints %}
+    <table>
+      <tr>
+        <th style="width:10%">Order</th>
+        <th style="width:20%">Description</th>
+        <th style="width:20%">Keywords</th>
+        <th style="width:40%">Content</th>
+        <th style="width:10%">Copy</th>
+      </tr>
+      {% for h in canned_hints %}
+      <tr>
+        <td>{{h.order}}</td>
+        <td>{{h.description}}</td>
+        <td><b>{% for tag in h.get_keywords %}{{tag}} {% endfor %}</b></td>
+        <td id="hint{{forloop.counter}}">{{h.content|linebreaks}}</td>
+        <td><button onclick="copyHint({{forloop.counter}})">Copy</button></td>
+      </tr>
+    {% endfor %}
+    </table>
+    {% else %}
+    There are no hints available for this puzzle.
+    {% endif %}
+  </section>
+</main>
+{% endblock content %}

@@ -1,9 +1,9 @@
-import Link from 'next/link';
+import Link from 'components/link';
 
 const ErrorContent = () => {
   return (
     <>
-      <h3 className="monospace">FIXME</h3>
+      <h3 className="font-mono">FIXME</h3>
     </>
   );
 };

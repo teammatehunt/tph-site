@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -e
+REAL_SOURCE="$(perl -e "use Cwd 'abs_path'; print abs_path('${BASH_SOURCE}')")"
+cd "$(dirname "$(dirname "${REAL_SOURCE}")")"
+
+# Output the registration data as a csv
+
+docker-compose exec -T tph /app/server/manage.py shell <<-EOF
+import csv
+import sys
+
+from spoilr.registration import models
+
+SEPARATOR = '\t'
+model = models.TeamRegistrationInfo
+writer = csv.writer(sys.stdout, dialect='unix')
+
+# headers
+fields = model._meta.get_fields()
+writer.writerow(field.verbose_name for field in fields)
+# values
+for item in models.TeamRegistrationInfo.objects.all().values_list(*(field.name for field in fields)):
+  writer.writerow('' if v is None else str(v) for v in item)
+EOF

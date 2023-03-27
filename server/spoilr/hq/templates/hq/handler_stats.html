@@ -1,0 +1,34 @@
+{% extends "hq/layout.tmpl" %}
+{% load spacelesser static %}
+
+{% block heading %}Handler Stats{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<p>
+  Click on a column header to sort.
+</p>
+<table class="sortable">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Discord</th>
+      <th>Hints Answered</th>
+      <th>Emails Answered</th>
+      <th>Interactions Completed</th>
+    </tr>
+  </thead>
+{% for handler_data in handler_stats %}
+  <tbody>
+    <tr>
+      <td>{{ handler_data.name }}</td>
+      <td>{{ handler_data.discord }}</td>
+      <td>{{ handler_data.num_hints }}</td>
+      <td>{{ handler_data.num_emails }}</td>
+      <td>{{ handler_data.num_interactions }}</td>
+    </tr>
+  </tbody>
+{% endfor %}
+</table>
+{% endblock %}

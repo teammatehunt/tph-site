@@ -56,8 +56,8 @@ td {
     </tr>
     {% for team in data %}
     <tr>
-        <td><a href="/team/{{ team.team.team_name|urlencode:"" }}">
-            {{ team.team.team_name }}
+        <td><a href="/team/{{ team.team.name|urlencode:"" }}">
+            {{ team.team.name }}
         </a></td>
         <td sorttable_customkey="{{ team.mm1_time|unix_time }}">
             {% format_time team.mm1_time %}
@@ -72,7 +72,7 @@ td {
     {% if is_superuser %}
     <tr>
         <td colspan="4">
-            <tt>{{ team.team.get_emails|join:', ' }}</tt>
+            <tt>{{ team.all_emails|join:', ' }}</tt>
         </td>
     </tr>
     {% endif %}

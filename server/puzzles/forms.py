@@ -1,112 +1,73 @@
-import hashlib
-
 from django import forms
+from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.core.validators import FileExtensionValidator, validate_email
-from django.db.models import Q
+from django.core.validators import FileExtensionValidator
+from spoilr.core.models import UserTeamRole
+from spoilr.registration.models import IndividualRegistrationInfo, TeamRegistrationInfo
 
-from puzzles.hunt_config import TEAM_SIZE
-from puzzles.models import Email, ExtraGuessGrant, Hint, Survey, Team, TeamMember
+from puzzles.models import ExtraGuessGrant, Team
+
+
+class CustomUserCreationForm(UserCreationForm):
+    class Meta(UserCreationForm.Meta):
+        model = get_user_model()
+        fields = UserCreationForm.Meta.fields
 
 
 class TeamCreationForm(forms.ModelForm):
-    name1 = forms.CharField(max_length=40, required=True)
-    name2 = forms.CharField(max_length=40, required=False)
-    name3 = forms.CharField(max_length=40, required=False)
-    name4 = forms.CharField(max_length=40, required=False)
-    name5 = forms.CharField(max_length=40, required=False)
-    name6 = forms.CharField(max_length=40, required=False)
-    name7 = forms.CharField(max_length=40, required=False)
-    name8 = forms.CharField(max_length=40, required=False)
-
-    email1 = forms.EmailField(required=True)
-    email2 = forms.EmailField(required=False)
-    email3 = forms.EmailField(required=False)
-    email4 = forms.EmailField(required=False)
-    email5 = forms.EmailField(required=False)
-    email6 = forms.EmailField(required=False)
-    email7 = forms.EmailField(required=False)
-    email8 = forms.EmailField(required=False)
-
     class Meta:
-        model = Team
-        fields = ["team_name"]
+        model = TeamRegistrationInfo
+        exclude = ["team"]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.team = None
-
-    def clean(self):
-        cleaned_data = super(forms.ModelForm, self).clean()
-
-        emails = []
-        for i in range(TEAM_SIZE):
-            name_field = f"name{i+1}"
-            email_field = f"email{i+1}"
-            name = cleaned_data.get(name_field)
-            email = cleaned_data.get(email_field)
-            if email:
-                if not name:
-                    self.add_error(name_field, "Name must be provided with email")
-                try:
-                    emails.append(email)
-                    validate_team_member_email_unique(email, team=self.team)
-                except forms.ValidationError as err:
-                    self.add_error(email_field, err)
-
-        if len(emails) != len(set(emails)):
-            raise forms.ValidationError(
-                "All of the provided email addresses should be unique"
-            )
-
+    # Set the team role to a shared user; assign the team to the reg info.
     def save(self, user):
-        team = super().save(commit=False)
-        team.user = user
+        team = Team(username=user.username, name=self.cleaned_data["team_name"])
         team.save()
 
-        for i in range(TEAM_SIZE):
-            name = self.cleaned_data.get(f"name{i+1}")
-            email = self.cleaned_data.get(f"email{i+1}")
+        user.team_role = UserTeamRole.SHARED_ACCOUNT
+        user.team = team
+        user.save()
 
-            if name:
-                TeamMember.objects.create(team=team, name=name, email=email)
+        team_registration_info = super().save(commit=False)
+        team_registration_info.team = team
+        team_registration_info.save()
 
         return team
 
 
-class TeamEditForm(TeamCreationForm):
+class TeamEditForm(forms.ModelForm):
     class Meta:
-        model = Team
-        fields = []
-
-    def __init__(self, team, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.team = team
+        model = TeamRegistrationInfo
+        exclude = ["team"]
 
 
-def validate_team_member_email_unique(email, team=None):
-    if TeamMember.objects.filter(~Q(team=team), email=email).exists():
-        raise forms.ValidationError(
-            "Someone with that email is already registered as a member on a "
-            "different team."
-        )
+class IndividualCreationForm(forms.ModelForm):
+    class Meta:
+        model = IndividualRegistrationInfo
+        exclude = ["user"]
+
+    # Associate the user with the individual registration info.
+    def save(self, user):
+        individual_registration_info = super().save(commit=False)
+        individual_registration_info.user = user
+        individual_registration_info.save()
+
+        return individual_registration_info
 
 
-class SubmitAnswerForm(forms.Form):
-    answer = forms.CharField(
-        label="Enter your guess:",
-        max_length=500,
-    )
+class IndividualEditForm(forms.ModelForm):
+    class Meta:
+        model = IndividualRegistrationInfo
+        exclude = ["user"]
 
 
 class RequestHintForm(forms.Form):
     text_content = forms.CharField(
         label=(
-            "Describe everything you\u2019ve tried on this puzzle. We will "
+            "Describe everything you've tried on this puzzle. We will "
             "provide a hint to help you move forward. The more detail you "
-            "provide, the less likely it is that we\u2019ll tell you "
+            "provide, the less likely it is that we'll tell you "
             "something you already know."
         ),
         widget=forms.Textarea,
@@ -118,76 +79,20 @@ class RequestHintForm(forms.Form):
 
     def __init__(self, team, *args, **kwargs):
         super(RequestHintForm, self).__init__(*args, **kwargs)
-        notif_choices = [("all", "Everyone"), ("none", "No one")]
-        notif_choices.extend(team.get_emails(with_names=True))
+        notif_choices = [
+            (team.team_email, "Team Captain"),
+            ("all", "Everyone"),
+            ("none", "No one"),
+        ]
         self.fields["notify_emails"] = forms.ChoiceField(
             label="When the hint is answered, send an email to:", choices=notif_choices
         )
-
-
-class AnswerEmailForm(forms.ModelForm):
-    # primary key id (as opposed to Message-Id)
-    email_in_reply_to_pk = forms.IntegerField(
-        widget=forms.HiddenInput,
-    )
-    ACTION_NO_REPLY = "no-reply"
-    ACTION_UNCLAIM = "unclaim"
-    # FIXME
-    ACTION_CUSTOM_PUZZLE = "custom-puzzle"
-
-    class Meta:
-        model = Email
-        fields = ["text_content"]
-
-    def clean(self):
-        action = self.data.get("action")
-        cd = self.cleaned_data
-        text = cd.get("text_content", "")
-        stripped_text = text.strip()
-        unclaimed = action == self.ACTION_UNCLAIM
-        resolved_without_reply = action == self.ACTION_NO_REPLY
-        custom_puzzle = action == self.ACTION_CUSTOM_PUZZLE
-        if resolved_without_reply:
-            if stripped_text:
-                self.add_error(
-                    field=None, error="Cannot autoresolve while text is nonempty."
-                )
-        elif unclaimed:
-            pass
-        elif custom_puzzle:
-            if stripped_text:
-                self.add_error(
-                    field=None, error="Cannot populate while text is nonempty."
-                )
-        else:
-            # sending
-            if not stripped_text:
-                self.add_error(field=None, error="Cannot send empty email.")
-        return cd
-
-
-class AnswerHintForm(forms.ModelForm):
-    # Hide the "No response" from the answer form.
-    status = forms.ChoiceField(choices=list(Hint.STATUSES.items())[1:])
-    hint_request_id = forms.IntegerField(
-        widget=forms.HiddenInput,
-    )
-
-    class Meta:
-        model = Hint
-        fields = ["text_content", "status"]
 
 
 class ExtraGuessGrantForm(forms.ModelForm):
     class Meta:
         model = ExtraGuessGrant
         fields = ["extra_guesses"]
-
-
-class SurveyForm(forms.ModelForm):
-    class Meta:
-        model = Survey
-        exclude = ["team", "puzzle"]
 
 
 # Redirect on 0 and otherwise redirect to donate page.

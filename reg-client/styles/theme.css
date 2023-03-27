@@ -1,0 +1,146 @@
+/* Variables for reg site */
+/* FIXME: choose a new font and styles */
+:root {
+  --background: #f2f2f2;
+  --background-transparent: #f2f2f266;
+  --background-dark: #dfebf7;
+  --navbar: var(--background-transparent);
+  --dark: #fffcdf;
+  --dark-translucent: rgba(255, 252, 223, 0.9);
+  --dark-transparent: rgba(255, 252, 223, 0);
+  --fade-gradient: linear-gradient(
+    180deg,
+    var(--navbar) 0%,
+    var(--dark-transparent) 100%
+  );
+  --theme-translucent: rgba(255, 255, 255, 0.8);
+  --text: #403a1e;
+  /* text-teal-700 from Tailwind */
+  --primary: rgb(15 118 110);
+  /* text-teal-100 from Tailwind */
+  --primary-accent: rgb(204 251 241);
+  --secondary: #ff5b5b;
+  --white: #fff;
+  --bg-off-white: #ebf0f1;
+  --black: #000;
+  --red: #ff5b5b;
+  --yellow: #dec57d;
+  --muted: #aaa;
+}
+
+/* Override the link color being primary */
+header.bg-transparent a {
+  color: var(--white) !important;
+}
+
+/* Links on the banner on the homepage */
+a.call-to-action {
+  color: var(--primary-accent) !important;
+  text-decoration: none !important;
+  font-weight: 300;
+}
+
+.bg-off-white {
+  background-color: var(--bg-off-white);
+}
+
+button {
+  background-color: var(--primary) !important;
+  color: var(--white) !important;
+  border: 0;
+  height: 3em;
+  border-radius: 1.5em;
+  padding: 0 2em !important;
+}
+
+/* Like button above, but in cases where we want a normal <a> link to look like a button */
+a.button-link {
+  background-color: var(--primary) !important;
+  color: var(--white) !important;
+  height: 3em;
+  border-radius: 2em;
+  padding: 1em 2em !important;
+  line-height: 3em;
+  text-decoration: none !important;
+}
+
+a.button-link-accent {
+  background-color: var(--primary-accent) !important;
+  color: var(--primary) !important;
+}
+
+a.button-link-white {
+  background-color: var(--white) !important;
+  color: var(--text) !important;
+}
+
+/* Override the default text primary colors for specific links */
+a.white {
+  color: var(--white) !important;
+}
+
+a.accent {
+  color: var(--primary-accent) !important;
+}
+
+button:disabled {
+  background-color: transparent !important;
+  color: var(--muted) !important;
+  border: 1px solid var(--muted);
+}
+
+.timeline {
+  position: relative;
+  padding-top: 4em;
+  padding-left: 4em;
+  list-style: none;
+  text-align: left;
+}
+.timeline p {
+  margin: 0;
+  padding-top: 1.5em; /* it's unfortunately difficult to get the baseline -0.5em up to align with the bullet, so accentuate the space to make it look ~intentional~ */
+}
+.timeline li,
+.timeline .end {
+  border-left: 2px solid #cccccc;
+  border-bottom-right-radius: 2px;
+  border-top-right-radius: 2px;
+  padding-bottom: 2.5em;
+  padding-left: 2em;
+  position: relative;
+}
+.timeline .end {
+  border: none;
+}
+.timeline.fade-last li:last-of-type {
+  padding-bottom: 4em;
+  border-image: linear-gradient(#cccccc, transparent) 1;
+}
+.timeline li:before,
+.timeline li:after,
+.timeline .end:after {
+  position: absolute;
+  display: block;
+  top: 0;
+}
+.timeline li:before {
+  left: -9em;
+  top: -0.4em;
+  color: #888888;
+  content: attr(data-date);
+  text-align: right;
+  min-width: 120px;
+}
+.timeline li:after,
+.timeline .end:after {
+  box-shadow: 0 0 0 2px #cccccc;
+  left: calc((-0.75em - 2px) / 2); /* -(diameter + line width) / 2 */
+  background: var(--bg-off-white);
+  border-radius: 50%;
+  height: 0.75em;
+  width: 0.75em;
+  content: "";
+}
+.timeline .end:after {
+  left: calc((-0.75em + 2px) / 2); /* -(diameter - line width) / 2 */
+}

@@ -1,0 +1,14 @@
+name: build-combined
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-registration:
+    uses: ./.github/workflows/docker-buildx.yml
+    with:
+      push: 1
+      cache: 1
+      ENABLE_HUNT_SITE: 1
+      ENABLE_REGISTRATION_SITE: 1
+    secrets: inherit

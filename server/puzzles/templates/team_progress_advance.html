@@ -111,13 +111,13 @@ small {
 }
 </style>
 
-<h1>Set Hunt Progress for {{ team_name }}</h1>
+<h1>Set Hunt Progress for {{ name }}</h1>
 
 <h2>This advances a team to different stages of the hunt. This overwrites
     submissions and solves - only do it for testing teams!</h2>
 
 {% if setting %}
-    <p>Set {{ team_name }} to {{ setting }}<p>
+    <p>Set {{ name }} to {{ setting }}<p>
 {% endif %}
 
 <form method="post">

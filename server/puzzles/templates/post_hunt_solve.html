@@ -13,7 +13,7 @@
 <h1>Check your answer for {{ puzzle.name }}</h1>
 
 <main>
-    {% if is_correct %}
+    {% if correct %}
     <div class="solved-panel">
         <h4>Solved!</h4>
         <p>The answer was <b>{{ puzzle.normalized_answer }}</b>.</p>

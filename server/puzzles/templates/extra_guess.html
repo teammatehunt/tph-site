@@ -2,7 +2,7 @@
 {% load puzzle_tags %}
 
 {% block page-title %}
-<title>Extra Guesses: {{ guess_grant.team.team_name }} wants guesses on {{ guess_grant.puzzle }}</title>
+<title>Extra Guesses: {{ guess_grant.team.name }} wants guesses on {{ guess_grant.puzzle }}</title>
 {% endblock %}
 
 {% block content %}
@@ -10,7 +10,7 @@
 <h1>Grant Extra Guesses</h1>
 
 <main>
-    <a href="/team/{{ guess_grant.team.team_name|urlencode:"" }}">{{ guess_grant.team }}</a>
+    <a href="/team/{{ guess_grant.team.name|urlencode:"" }}">{{ guess_grant.team }}</a>
     has requested more guesses on
     <a href="/puzzles/{{ guess_grant.puzzle.slug }}">{{ guess_grant.puzzle }}</a>
     <p>They've made {{ ratelimit.guessesMade | length }} guesses in the past 24 hours.</p>

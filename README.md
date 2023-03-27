@@ -1,12 +1,10 @@
 # Teammate Hunt Template (tph-site)
 
-[[_TOC_]]
-
 ## Overview
 
 The teammate repo is based on a fork of [gph-site](https://github.com/galacticpuzzlehunt/gph-site),
 with many changes made to support the needs of past Teammate Hunts. The largest change
-is changing the site from pure Django to a Next.js + Django hybrid, with a [React](https://web.dev/react/)-based
+is changing the site from pure Django to a Next.js + Django hybrid, with a [React](https://react.dev/)-based
 frontend. As such, it is largely incompatible with gph-site architecture and
 unfortunately cannot be merged upstream.
 
@@ -16,16 +14,13 @@ interactive components, this repo is for you.
 
 For setup and development instructions, read on.
 
-For detailed overviews of the backend and frontend, check the READMEs in `server/`
-and `client/` respectively.
+For detailed overviews of the backend and frontend, check the
+[server](server/README.md) and [client](client/README.md) READMEs respectively.
 
 For a high-level overview of how this repo works, or more advanced features,
-check the READMEs in `doc/`.
+check the [doc](doc/index.md) directory.
 
-### How to fork this repo
-
-You can [fork this repo on GitLab](https://docs.gitlab.com/ee/user/project/repository/forking_workflow.html)
-directly from the UI, or [fork to GitHub (see Stack Overflow answer)](https://stackoverflow.com/a/22266000).
+For additional features added for Mystery Hunt 2023, see [Mystery Hunt](doc/mystery_hunt.md).
 
 ## System Requirements
 
@@ -54,7 +49,7 @@ is via the Windows Subsystem for Linux (WSL).
   Windows](https://docs.docker.com/desktop/windows/install/)
 - `docker-compose`: Comes with Docker Desktop for Windows
 
-For all the command in the rest of this readme, use the WSL or Ubuntu terminal.
+For all the commands in the rest of this readme, use the WSL or Ubuntu terminal.
 
 If you don't want to or can't install these, an alternative is to start a
 Ubuntu virtual machine and follow the linux instructions.
@@ -75,10 +70,31 @@ Ubuntu virtual machine and follow the linux instructions.
 
 ## Getting Started
 
+### Clone this repo
+
+Enter your github username and password when prompted.
+
+```
+# FIXME
+git clone https://github.com/teammatehunt/tph-site.git
+cd tph-site
+```
+
+If you have ssh keys set up, you can clone with `git clone git@github.com:teammatehunt/tph-site.git` (FIXME)
+instead for passwordless authentication.
+
 ### Set up and start everything
+
+This will install git pre-commit hooks and build the development environment.
 
 ```
 ./initialize_dev
+```
+
+Next, load the fixtures (puzzle, round, and other metadata imported from PuzzUp):
+
+```
+./scripts/load_fixtures
 ```
 
 Open a browser and go to `https://localhost:8081/`. There will probably be a
@@ -90,6 +106,8 @@ You should now see a development version of the site! In the dev environment, a
 testsolving team has been created with username `dev` and password `dev`. If
 you need to access the admin panel, there is also an admin account with
 username `admin` and password `admin`.
+
+If you have multiple domains enabled, you can go to `https://localhost:8082`.
 
 ### Monitor logs
 
@@ -107,11 +125,19 @@ You can also display docker level logs with `./scripts/tail_docker_logs` but it
 is less likely you will need them.
 
 While running, persistent server data is mounted under a docker volume (on
-linux it is probably `/var/lib/docker/volumes/{repo_name}_srv_dev`).
+linux it is probably `/var/lib/docker/volumes/tph-site_srv_dev`). (FIXME)
 
 ## Postprodding Puzzles
 
-To scaffold a new puzzle, run this script and follow the command line prompts
+Postproduction is integrated with PuzzUp. You can use the autopostprod feature on PuzzUp to scaffold a new puzzle
+(see the [Guide here](https://github.com/teammatehunt/puzzup#autopostprod)).
+
+This will automatically create a new branch you can checkout on Git. Make sure to
+run `./scripts/load_fixtures` to load the puzzle metadata into your database.
+
+### Manual Scaffolding
+
+To scaffold a puzzle manually, run this script and follow the command line prompts
 to enter the puzzle title, answer, etc. This will automatically create the
 puzzle in the database and the proper frontend files.
 
@@ -132,66 +158,62 @@ If you need to edit server side puzzle model information, you can go to
 
 We use the [black](https://black.readthedocs.io/en/stable/) Python formatter and
 [prettier](https://prettier.io/) for Typescript files.
+[pre-commit](https://pre-commit.com/) will enforce formatting (as well as run
+some other basic checks like ensuring we do not commit directly to staging or
+main). This gets installed to your git hooks on the first instantiation of
+`./initialize_dev`.
 
-This script will format all code for consistency.
+If you have a section of code that you don't want to be touched by our
+formatters, you can add a comment to ignore. For example, in `.tsx` files,
+inserting `{/* prettier-ignore */}` will cause the entire HTML/JSX node
+following the comment to not be reformatted. This can be useful for pasting in
+generated code, such as a table produced from an external script (though we
+would encourage storing generated data as intermediary json assets and
+importing them instead).
 
-```
-./scripts/reformat
-```
+If you need to commit and bypass style checks (eg, code is a broken
+work-in-progress and you are trying to share with someone), you can run `git commit --no-verify` to not run git hooks.
 
-This is enforced by a [pre-commit check](https://pre-commit.com/), which you can
-install with
+## Merging Postprodding Changes
 
-```
-# pip
-pip install pre-commit
-# or Mac OS
-brew install pre-commit
-
-pre-commit install
-```
-
-## Sample Postprod Workflow
-
-Changes to the site are version controlled by git. We use merge requests (MRs/PRs)
-to review the changes before they are merged into the production branch. Here is
-a sample workflow we used to add changes to the site.
+Changes to the site are version controlled by git. We use pull requests (PRs)
+to review the changes before they are merged into the production branch.
 
 - Make sure you have added the puzzle to the fixtures. Either add it via
   `https://localhost:8081/admin` and then run `./scripts/save_fixtures` OR
-  edit `server/fixtures/puzzles/<slug>.yaml` directly.
-  - Set the puzzle name, slug, and emoji. DEEP threshold can be 0 and answer
-    can be `REDACTED` until the full hunt testsolve.
+  edit `server/tph/fixtures/puzzles/<slug>.yaml` directly.
+  - Set the puzzle name, slug, and emoji.
   - If the puzzle has already been testsolved, you can set the `meta` and `round`
     fields accordingly.
-- Format, commit, and push changes to GitLab or GitHub.
+- Format, commit, and push changes to Github.
 
 ```sh
-./scripts/reformat                         # Format all code (dev server must be running)
 git checkout -b postprod/[INSERT_SLUG]     # postprodding should be done on a new branch
 git add :/                                 # add all changes to the staging index
 git commit -m '[INSERT POSTPROD MESSAGE]'  # commit changes
-git push -u origin postprod/[INSERT_SLUG]  # push branch to remote repo (might ask you to authenticate)
+git push -u origin postprod/[INSERT_SLUG]  # push branch to github (might ask you to authenticate)
 ```
 
-- Then if you go to your repo on GitLab or GitHub, you will be able to create an MR with your changes.
-  - When the MR is created, a pipeline will start which verifies type checks
+- Then if you go to <FIXME repo url>, you
+  will be able to create a PR with your changes.
+  - When the PR is created, a pipeline will start which verifies type checks
     and static code generation for typescript/React.
   - If it fails, you can make changes to fix it and push again. If you want to
     run the full build locally, read ["Running as in prod"](#running-as-in-prod).
 
 ## Deployment
 
-Build and push steps are configured via GitLab's CI/CD pipeline in
-`.gitlab-ci.yml`. Build and tests will automatically run on every commit; you
-can manually trigger the tag, publish, and deploy steps via GitLab UI in order
-to deploy to staging or production.
+Build and push steps are configured via Github CI/CD workflows in
+`.github/workflows`. Build and tests will automatically run on every commit.
+After pushing a commit, the frontend will be deployed to
+`[YOUR-BRANCH-SLUG].branch.teammatehunt.com`. The basicauth username / password
+are the same as the ones for the staging site.
 
-You will need to modify the variables for which host to deploy to, as well as
-set a few variables in GitLab UI (see the comments in `.gitlab-ci.yml`).
-
-If you would like to switch to GitHub, you'll likely need to rewrite this file
-in the format of [GitHub Actions](https://github.com/features/actions).
+You can manually trigger the deploy step via the [GitHub Actions
+UI](FIXME repo-url /actions/workflows/deploy-staging.yml)
+in order to deploy to staging or production (by clicking "Run Workflow"). Note
+that deploys to prod will fail if you pick something other than the `main`
+branch.
 
 ## Running as in prod
 
@@ -206,31 +228,46 @@ pointing to localhost). Note that this will use a separate database from the
 dev environment.
 
 ```
-./scripts/initialize_staging --localhost
+./scripts/initialize_staging_localhost
 ```
 
 No users or teams are created by default for the staging environment.
+
+## Fetching art assets
+
+Google Drive is the source of truth for round art and puzzle icons. We use
+`./scripts/sync_media` to sync these to a machine and generate a unique mapping
+of hashed filenames to serve from. To fetch these locally, you can put the
+[service account credentials FIXME](FIXME)
+in the root of this repo and run `./scripts/sync_media [DEST_DIRECTORY]`.
+To fetch them into the development container, in the root of this repo run `./scripts/sync_media dev`.
+
+The asset map is loaded into each process' memory during startup automatically.
+If you already have a server running, either restart your server or hot reload
+Django (by editing/saving a Python file) to see the new assets.
+To resolve a path to its hashed name, use `puzzles.assets.get_hashed_url`.
 
 ## Adding or updating packages
 
 ### Python
 
-Editing `server/requirements.txt` and rebuilding the docker container should
-work smoothly.
+After adding a dependency to `server/poetry/pyproject.toml`, running
+`./scripts/update_poetry_lock` (while the dev container is running), and
+rebuilding the docker container should work smoothly. Also see
+[the backend documentation](server/README.md#repository-details).
 
 ### Typescript
 
-This will require `yarn` on your host system. In `client/` run `yarn install`
-and the rebuilding the docker container should work. Running `yarn` on the host
-is necessary to update the `yarn.lock` file which contains versions of all
-installed packages.
+After adding a dependency to `client/package.json`, running
+`./scripts/update_yarn_lock` (while the dev container is running), and
+rebuilding the docker container should work smoothly.
 
 ## Dumping the database
 
 To dump the database, run:
 
 ```
-docker-compose exec -T -u postgres db pg_dump postgres > ~/staging-{date}.dump
+docker-compose exec -T -u postgres db pg_dump postgres > ~/{staging,prod}-{date}.dump
 ```
 
 To load the database (after putting the file on another machine), shut down the
@@ -238,12 +275,21 @@ existing containers, delete the `tph_pgdata` volume, start the postgres server,
 load the database, and refresh the container.
 
 ```
-./scripts/teardown.sh
+./teardown
 docker volume rm tph_pgdata
 docker-compose up -d db
 docker-compose exec -T -u postgres db psql postgres < ~/staging-{date}.dump
-./refresh.sh
+./initialize_dev
 ```
+
+## Running the registration site
+
+Use the `--reg` arg (ie, `./initialize_dev --reg` or
+`./scripts/initialize_staging_localhost --reg`) to also run the registration site
+on `https://localhost:8083`.
+
+The frontend for the registration site uses `reg-client/` instead of `client/`,
+though files and directories that should be the same can be symlinked.
 
 # Old Setup
 
@@ -266,6 +312,4 @@ will automatically re-build any changes you make to the code.
 
 Some requests should go to the front-end's development server, and some to the
 back-end's. To route the requests appropriately, we're using `caddy` as a
-reverse proxy. Run `sudo ./caddy start` to start it. It needs root permissions
-to install an SSL certificate for `localhost` to your system. Even then, you may
-need to bypass SSL warnings in your browser.
+reverse proxy.

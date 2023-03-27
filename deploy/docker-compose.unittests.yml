@@ -1,0 +1,24 @@
+# This docker compose override file is used for Gitlab CI unit tests
+version: '3.7'
+
+services:
+  db:
+    restart: "no"
+  pgbouncer:
+    restart: "no"
+  redis:
+    restart: "no"
+  tph:
+    restart: "no"
+    image: ${IMAGE_TAG}
+    env_file: .env
+    environment:
+      # go to db directly in unittests (pgbouncer fails for some reason)
+      - POSTGRES_HOST=db
+      - SKIP_LARGE_DEPENDENCIES=1
+      - DONT_RUN_SERVER=1
+    command: bash -c "/entrypoint.sh && cd /app/server && ./manage.py test"
+    networks:
+      default:
+        aliases:
+          - django

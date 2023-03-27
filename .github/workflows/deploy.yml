@@ -1,0 +1,212 @@
+# Make sure to set these variables in Github:
+# - $DEPLOY_SSH_KEY_BASE64
+# - $DEPLOY_SSH_KNOWN_HOSTS
+# - Create a deploy token with name github-deploy-token
+# In the workflow calling this template, add SERVER_HTTP_BIND_PREFIX to the
+# EXTRA_ENV input if you need to serve on other ports (eg, 24443/24080 instead
+# of 443/80). This is useful if you are running behind another reverse proxy on
+# the host machine.
+
+name: deploy-base
+
+env:
+  # FIXME: Change these to your own container registry
+  CI_REGISTRY: registry.gitlab.com
+  CI_REGISTRY_IMAGE: registry.gitlab.com/teammate/mh-2023/mh-2023
+
+on:
+  workflow_call:
+    inputs:
+      assert_branch:
+        # if provided, the deploy will fail if not deployed from the branch
+        # assert_branch or the tag assert_tag
+        type: string
+      assert_tag:
+        # if provided, the deploy will fail if not deployed from the branch
+        # assert_branch or the tag assert_tag
+        type: string
+      DEPLOY_USER:
+        # login username on the server to deploy to
+        type: string
+        required: true
+      DEPLOY_HOST:
+        # hostname/domain/IP of the the server to deploy to
+        type: string
+        required: true
+      SERVER_ENVIRONMENT:
+        # value of the SERVER_ENVIRONMENT variable to be deployed (one of:
+        # prod, staging, dev, test_branch, posthunt)
+        type: string
+        required: true
+      UVICORN_NUM_PROCS:
+        # number of Django processes
+        type: string
+        default: "2"
+      CELERY_NUM_PROCS:
+        # number of Celery processes for running task queues
+        type: string
+        default: "1"
+      BUILD_SITE:
+        # '':  hunt
+        # 'reg': reg
+        # 'hunt-reg': combined
+        # 'posthunt-reg': combined archival site
+        type: string
+      DEPLOY_TYPE:
+        # only set if you need to use a different docker-compose.yml
+        type: string
+      DEPLOY_DIR:
+        # used to set a separate directory for each deployed branch
+        type: string
+      POSTGRES_CONF:
+        type: string
+        default: deploy/postgresql.default.conf
+      HUNT_HOST:
+        type: string
+      REGISTRATION_HOST:
+        type: string
+      POSTHUNT_HOST:
+        type: string
+      BRANCH_BACKEND_HOSTNAME:
+        type: string
+      TEST_BRANCH_BACKEND:
+        type: string
+      TEST_BRANCH_FRONTEND:
+        type: string
+      COPY_DRIVE_CREDS:
+        # if nonempty, save Drive credentials to the host
+        type: string
+      EXTRA_ENV:
+        # add any additional env variables to this input, separated by newlines
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy to server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch
+        if: >-
+          ${{
+            (inputs.assert_branch || inputs.assert_tag)
+            && github.ref != format('refs/heads/{0}', inputs.assert_branch)
+            && github.ref != format('refs/tags/{0}', inputs.assert_tag)
+          }}
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.setFailed( 'Branch must be ${{ inputs.assert_branch }}: ${{ github.ref_name }}' )
+      - name: Set env
+        run: |
+          export BUILD_SITE=${{ inputs.BUILD_SITE }}
+          export IMAGE_PREFIX="${BUILD_SITE:+${BUILD_SITE}-}"
+          export CI_COMMIT_SHORT_SHA=${GITHUB_SHA::8}
+          export CI_COMMIT_REF_SLUG=${GITHUB_REF_NAME//[^[:alnum:]_]/-}
+          export IMAGE_TAG_SHA=$CI_REGISTRY_IMAGE:${IMAGE_PREFIX}sha-$CI_COMMIT_SHORT_SHA
+          export DEPLOY_USER=${{ inputs.DEPLOY_USER }}
+          export DEPLOY_HOST=${{ inputs.DEPLOY_HOST }}
+          export SERVER_ENVIRONMENT=${{ inputs.SERVER_ENVIRONMENT }}
+          export UVICORN_NUM_PROCS=${{ inputs.UVICORN_NUM_PROCS }}
+          export CELERY_NUM_PROCS=${{ inputs.CELERY_NUM_PROCS }}
+          export TEST_BRANCH_BACKEND=${{ inputs.TEST_BRANCH_BACKEND }}
+          export TEST_BRANCH_FRONTEND=${{ inputs.TEST_BRANCH_FRONTEND }}
+          export BRANCH_BACKEND_HOSTNAME=${{ inputs.BRANCH_BACKEND_HOSTNAME }}
+          export COPY_DRIVE_CREDS=${{ inputs.COPY_DRIVE_CREDS }}
+          export EXTRA_ENV="${{ inputs.EXTRA_ENV }}"
+          export DEPLOY_TYPE=${{ inputs.DEPLOY_TYPE }}
+          export DEPLOY_DIR=${{ inputs.DEPLOY_DIR }}${TEST_BRANCH_FRONTEND:+$CI_COMMIT_REF_SLUG}
+          export DEPLOY_DIR_DEFAULTED="${DEPLOY_DIR:-tph}"
+          export POSTGRES_CONF=${{ inputs.POSTGRES_CONF }}
+          INPUT_HUNT_HOST=${{ inputs.HUNT_HOST }}
+          export HUNT_HOST="${INPUT_HUNT_HOST:+${TEST_BRANCH_FRONTEND:+${CI_COMMIT_REF_SLUG}}${INPUT_HUNT_HOST}}"
+          INPUT_REGISTRATION_HOST=${{ inputs.REGISTRATION_HOST }}
+          export REGISTRATION_HOST="${INPUT_REGISTRATION_HOST:+${TEST_BRANCH_FRONTEND:+${CI_COMMIT_REF_SLUG}}${INPUT_REGISTRATION_HOST}}"
+          INPUT_POSTHUNT_HOST=${{ inputs.POSTHUNT_HOST }}
+          export POSTHUNT_HOST="${INPUT_POSTHUNT_HOST:+${TEST_BRANCH_FRONTEND:+${CI_COMMIT_REF_SLUG}}${INPUT_POSTHUNT_HOST}}"
+          export CADDY_PROTOCOL="${TEST_BRANCH_FRONTEND:+http://}"
+          export CADDY_HUNT_HOST="${HUNT_HOST:+${CADDY_PROTOCOL}${HUNT_HOST}}"
+          export CADDY_REGISTRATION_HOST="${REGISTRATION_HOST:+${CADDY_PROTOCOL}${REGISTRATION_HOST}}"
+          export CADDY_POSTHUNT_HOST="${POSTHUNT_HOST:+${CADDY_PROTOCOL}${POSTHUNT_HOST}}"
+          # Export env to be reused in later steps. Like `env >> $GITHUB_ENV` but works with multiline values
+          env -0 | tr '\n' '\r' | tr '\0' '\n' | cut -s -d'=' -f1 | xargs -I{} sh -c 'printf "{}<<ENV_EOF\n%s\nENV_EOF\n" "${}"' >> $GITHUB_ENV
+      - name: Setup ssh
+        run: |
+          eval $(ssh-agent -s)
+          echo "${{ secrets.DEPLOY_SSH_KEY_BASE64 }}" | base64 -d | ssh-add -
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          # Export env to be reused in later steps. Like `env >> $GITHUB_ENV` but works with multiline values
+          env -0 | tr '\n' '\r' | tr '\0' '\n' | cut -s -d'=' -f1 | xargs -I{} sh -c 'printf "{}<<ENV_EOF\n%s\nENV_EOF\n" "${}"' >> $GITHUB_ENV
+          # ensure directory is set
+          [ -n "$DEPLOY_DIR_DEFAULTED" ] && [ -z "${DEPLOY_DIR_DEFAULTED//[^ ]/}" ]
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Remove previous files
+        run: >-
+          ssh -vvv $DEPLOY_USER@$DEPLOY_HOST
+          "rm -rf ~/$DEPLOY_DIR_DEFAULTED && mkdir -p ~/$DEPLOY_DIR_DEFAULTED"
+      - name: Copy files
+        run: >-
+          scp -r
+          docker-compose.yml
+          scripts
+          deploy/refresh.sh
+          ${TEST_BRANCH_BACKEND:+deploy/prune_test_frontends}
+          $DEPLOY_USER@$DEPLOY_HOST:~/$DEPLOY_DIR_DEFAULTED
+          && scp deploy/docker-compose.${DEPLOY_TYPE:-registry}.yml
+          $DEPLOY_USER@$DEPLOY_HOST:~/$DEPLOY_DIR_DEFAULTED/docker-compose.registry.yml
+          && scp ${POSTGRES_CONF}
+          $DEPLOY_USER@$DEPLOY_HOST:~/$DEPLOY_DIR_DEFAULTED/postgresql.conf
+      - name: Refresh server
+        run: |-
+          ssh $DEPLOY_USER@$DEPLOY_HOST 'bash -l <(cat) </dev/null' <<SSH
+          set -e
+          cat <<ENV > ~/$DEPLOY_DIR_DEFAULTED/.env
+          SERVER_ENVIRONMENT=$SERVER_ENVIRONMENT
+          UVICORN_NUM_PROCS=$UVICORN_NUM_PROCS
+          CELERY_NUM_PROCS=$CELERY_NUM_PROCS
+          IMAGE_TAG=$IMAGE_TAG_SHA
+          COMMIT_REF_SLUG=$CI_COMMIT_REF_SLUG
+          ENV
+          if [ -n "$HUNT_HOST" ]; then cat <<HUNT_HOST_ENV >> ~/$DEPLOY_DIR_DEFAULTED/.env; fi
+          HUNT_HOST=$HUNT_HOST
+          CADDY_HUNT_HOST=$CADDY_HUNT_HOST
+          HUNT_HOST_ENV
+          if [ -n "$REGISTRATION_HOST" ]; then cat <<REGISTRATION_HOST_ENV >> ~/$DEPLOY_DIR_DEFAULTED/.env; fi
+          REGISTRATION_HOST=$REGISTRATION_HOST
+          CADDY_REGISTRATION_HOST=$CADDY_REGISTRATION_HOST
+          REGISTRATION_HOST_ENV
+          if [ -n "$POSTHUNT_HOST" ]; then cat <<POSTHUNT_HOST_ENV >> ~/$DEPLOY_DIR_DEFAULTED/.env; fi
+          POSTHUNT_HOST=$POSTHUNT_HOST
+          CADDY_POSTHUNT_HOST=$CADDY_POSTHUNT_HOST
+          POSTHUNT_HOST_ENV
+          if [ "$SERVER_ENVIRONMENT" = "prod" ]; then cat <<PROD_ENV >> ~/$DEPLOY_DIR_DEFAULTED/.env; fi
+          SMTP_PASSWORD=${{ secrets.PROD_SMTP_PASSWORD }}
+          PROD_ENV
+          if [ "$SERVER_ENVIRONMENT" = "staging" ]; then cat <<STAGING_ENV >> ~/$DEPLOY_DIR_DEFAULTED/.env; fi
+          SMTP_PASSWORD=${{ secrets.STAGING_SMTP_PASSWORD }}
+          STAGING_ENV
+          if [ -n "$EXTRA_ENV" ]; then cat <<HEREDOC_EXTRA_ENV >> ~/$DEPLOY_DIR_DEFAULTED/.env; fi
+          $EXTRA_ENV
+          HEREDOC_EXTRA_ENV
+          if [ -n "$TEST_BRANCH_FRONTEND" ]; then cat <<TEST_FRONTEND_ENV >> ~/$DEPLOY_DIR_DEFAULTED/.env; fi
+          TEST_BRANCH_FRONTEND=1
+          TEST_FRONTEND_ENV
+          if [ -n "$COPY_DRIVE_CREDS" ]; then
+            echo "${{ secrets.DEPLOY_DRIVE_CREDS_BASE64 }}" | base64 -d > ~/$DEPLOY_DIR_DEFAULTED/gdrive-creds.json
+          fi
+          if [ -n "$TEST_BRANCH_BACKEND" ]; then cat <<DNS_ENV >> ~/$DEPLOY_DIR_DEFAULTED/.env; fi
+          CADDY_BRANCH_HOSTNAME=*.$BRANCH_BACKEND_HOSTNAME
+          DUCKDNS_API_TOKEN=${{ secrets.DEPLOY_DUCKDNS_API_TOKEN }}
+          TEST_BRANCH_BACKEND=1
+          DNS_ENV
+          docker login -u ${{ secrets.CI_REGISTRY_USER }} -p ${{ secrets.CI_REGISTRY_PASSWORD }} $CI_REGISTRY
+          ~/$DEPLOY_DIR_DEFAULTED/refresh.sh
+          if [ -n "$TEST_BRANCH_FRONTEND" ]; then
+            if [ -x ~/tph/prune_test_frontends ]; then ~/tph/prune_test_frontends; fi
+            # (cd ~/tph && docker-compose exec -T tph /app/server/manage.py ensure_user_created $CI_COMMIT_REF_SLUG --password $CI_COMMIT_REF_SLUG --internal)
+          fi
+          SSH
+          echo "### :rocket: Deployed" >> $GITHUB_STEP_SUMMARY
+          HOSTNAME=${HUNT_HOST:-${REGISTRATION_HOST}}
+          echo "\`$GITHUB_REF_NAME\` was deployed to [$HOSTNAME](https://$HOSTNAME)" >> $GITHUB_STEP_SUMMARY

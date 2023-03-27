@@ -1,0 +1,9 @@
+- model: spoilr_core.huntsetting
+  pk: 9
+  fields:
+    name: spoilr.hunt.solutions_released
+    text_value: null
+    boolean_value: false
+    date_value: null
+    create_time: 2023-01-12 04:42:00.101643+00:00
+    update_time: 2023-01-12 04:42:00.101643+00:00

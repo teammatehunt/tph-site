@@ -1,0 +1,23 @@
+name: deploy-testing
+
+on:
+  workflow_dispatch:
+
+concurrency: deploy-testing
+
+jobs:
+  deploy-testing:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      DEPLOY_USER: testing
+      DEPLOY_HOST: testing.teammatehunt.com
+      SERVER_ENVIRONMENT: staging
+      HUNT_HOST: testing.teammatehunt.com
+      REGISTRATION_HOST: testing3.teammatehunt.com
+      COPY_DRIVE_CREDS: 1
+      EXTRA_ENV: |-
+        # serve HTTP on 172.17.0.1:24080
+        SERVER_HTTP_BIND_PREFIX=172.17.0.1:24
+        GOOGLE_ANALYTICS_ID=FIXME
+        CDN_HUNT_HOST=cdn.testing.teammatehunt.com
+    secrets: inherit

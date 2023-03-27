@@ -1,0 +1,126 @@
+{% extends "hq/layout.tmpl" %}
+{% load static timedelta fronturl%}
+
+{% block title %}Dashboard: {{ team.name|truncatechars:40 }} | {{ block.super }}{% endblock %}
+{% block heading %}Dashboard: {{ team.name|truncatechars:40 }}{% endblock %}
+
+{% block breadcrumb_items %}
+<li><a href="{% url 'spoilr.progress:teams' %}">Teams Dashboard</a></li>
+<li><a href="{% url 'spoilr.progress:team' team.username %}">{{ team.name|truncatechars:40 }}</a></li>
+{% endblock breadcrumb_items %}
+
+{% block content %}
+<section class="content team">
+  <div class="banner">
+    {% comment %}
+    <div>
+      <b><a href="{% url 'impersonate' team.username %}">Impersonate Team</a></b> -
+      <b>Be very careful!</b> This will affect the team's hunt progress.
+    </div>
+    {% endcomment %}
+  </div>
+
+  <b>Team</b>: <em>{{ team.name }}</em><br>
+  <b>Team Email</b>: {% if team.team_email %}<a href="mailto:{{ team.team_email }}" target="_blank">{{ team.team_email }}</a>{% else %}<em>No team email</em>{% endif %}<br>
+  <b><a href="{% url 'hq_log' %}?team={{ team.username }}" target="_blank">Logs</a></b>
+  {# <a href="{% url 'spoilr.email:archive' %}?team={{ team.username }}" target="_blank">Emails</a> #}
+  <br><br>
+
+  {% if team.teamregistrationinfo %}
+    <b>Primary Contact</b>: {{ team.teamregistrationinfo.contact_name }} ({{ team.teamregistrationinfo.contact_pronouns }})<br>
+    <b>Primary Contact Email</b>: <a href="mailto:{{ team.contact_email }}" target="_blank">{{ team.contact_email }}</a><br>
+    <b>Primary Contact Phone</b>: {{ team.teamregistrationinfo.contact_phone }}<br><br>
+    <b>Size</b>: {{ team.teamregistrationinfo.size_total }}<br>
+  {% endif %}
+
+  <b>Hints</b>: {{ hints }}<br><br>
+
+  <b>Rounds</b>:
+  <table>
+    {% for x in rounds %}
+    <tr {% if x.access %}class="solved"{% endif %}>
+      <td><a href="{% fronturl 'rounds' x.round.slug %}">{{ x.round.name }}</a></td>
+      <td>
+        {% if x.access %}
+        Released {{ x.access.timestamp|date:'D H:i:s' }}
+        {% else %}
+        Not released
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table><br>
+
+  <b>Metapuzzles</b>:
+  <table>
+    {% for x in puzzles %}
+    {% if x.puzzle.is_meta %}
+    <tr {% if x.access and x.access.solved %}class="solved"{% else %}class="unsolved"{% endif %}>
+      <td><a href="{% fronturl 'puzzles' x.puzzle.slug %}">{{ x.puzzle.name }}</a></td>
+      <td>
+        {% if x.access and x.access.solved %}
+        Solved
+        {% elif x.access %}
+        Released {{ x.access.timestamp|date:'D H:i:s' }}
+        {% else %}
+        Not released
+        {% endif %}
+      </td>
+      <td>{% if x.access.solved %}{{ x.puzzle.answer }}{% endif %}</td>
+      <td>{% if x.solve_time %}{{ x.solve_time|natural_timedelta }}{% endif %}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </table><br>
+
+  <b>Interactions</b>:
+  <table>
+    {% for x in interactions %}
+    <tr {% if x.access and x.access.accomplished %}class="solved"{% elif x.access %}class="unsolved"{% endif %}>
+      <td>{% if x.access %}<a href="{% url 'spoilr.interaction:details' x.interaction.slug team.username %}">{% endif %}{{ x.interaction.name }}{% if x.access %}</a>{% endif %}</td>
+      <td>
+        {% if x.access and x.access.accomplished %}
+        Accomplished
+        {% elif x.access %}
+        Ready
+        {% else %}
+        Not Ready
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table><br>
+
+  <b>Puzzles</b>:
+  <table>
+    {% for x in puzzles %}
+    {% if not x.puzzle.is_meta %}
+    <tr {% if x.access and x.access.solved %}class="solved"{% elif x.access %}class="unsolved"{% endif %}>
+      <td><a href="{% fronturl 'rounds' x.puzzle.round.slug %}">{{ x.puzzle.round.name }}</a></td>
+      <td><a href="{% fronturl 'puzzles' x.puzzle.slug %}">{{ x.puzzle.name|truncatechars:50 }}</a></td>
+      <td>
+        {% if x.access and x.access.solved %}
+        Solved
+        {% elif x.access %}
+        Released {{ x.access.timestamp|date:'D H:i:s' }}
+        {% else %}
+        Not Released
+        {% endif %}
+      </td>
+      <td>{% if x.access.solved %}{{ x.puzzle.answer }}{% endif %}</td>
+      <td>{% if x.solve_time %}{{ x.solve_time|natural_timedelta }}{% endif %}</td>
+      <td>{% if x.hints %}{{ x.hints }} hint{{x.hints|pluralize}}{% endif %}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+</section>
+{% endblock content %}
+
+{% block stylesheets %}
+<link rel="stylesheet" type="text/css" href="{% static 'spoilr/progress/style.css' %}">
+{% endblock %}
+
+{% block scripts %}
+{% include 'hq/util/auto-reload-script.tmpl' %}
+{% endblock scripts %}

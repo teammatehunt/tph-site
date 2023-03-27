@@ -30,7 +30,6 @@ export const FormRow: FunctionComponent<FormRowProps> = ({
       <style jsx>{`
         label {
           color: var(--primary);
-          text-align: right;
           height: 28px;
           padding-top: 8px;
         }

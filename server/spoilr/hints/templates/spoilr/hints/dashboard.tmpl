@@ -1,0 +1,212 @@
+{% extends "hq/layout.tmpl" %}
+{% load humanize static timedelta %}
+
+{% block title %}Hint Queue | {{ block.super }}{% endblock %}
+{% block heading %}Hint Queue{% endblock %}
+
+{% block breadcrumb_items %}
+<li><a href="{% url 'spoilr.hints:dashboard' %}?puzzle=&team=&open=1&limit=50">Hint Queue</a></li>
+{% endblock breadcrumb_items %}
+
+{% block content %}
+<section>
+    <form method="get" class="filters">
+    <nav class="level">
+      <div class="level-left">
+        <div class="level-item">
+          Filter
+        </div>
+        <div class="level-item">
+          <div class="select is-small">
+          <select name="puzzle" id="id_puzzle">
+            <option value=""{% if not puzzle %} selected{% endif %}>All puzzles</option>
+            {% for puzzle_url in puzzles %}
+            <option value="{{ puzzle_url }}"{% if puzzle == puzzle_url %} selected{% endif %}>{{ puzzle_url }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        </div>
+        <div class="level-item">
+          <div class="select is-small">
+          <select name="team" id="id_team">
+            <option value=""{% if not team %} selected{% endif %}>All teams</option>
+            {% for team_username in teams %}
+            <option value="{{ team_username }}"{% if team == team_username %} selected{% endif %}>{{ team_username }}</option>
+            {% endfor %}
+          </select>
+          </div>
+        </div>
+        <div class="level-item">
+          <div class="select is-small">
+          <select name="open" id="id_open">
+            <option value="1"{% if open_only %} selected{% endif %}>Open hint requests</option>
+            <option value="0"{% if not open_only %} selected{% endif %}>All hint requests</option>
+          </select>
+          </div>
+        </div>
+        <div class="level-item">
+          <div class="select is-small">
+          <select name="unclaimed" id="id_unclaimed">
+            <option value="1"{% if unclaimed_only %} selected{% endif %}>Unclaimed/claimed by me</option>
+            <option value="0"{% if not unclaimed_only %} selected{% endif %}>Any claimant</option>
+          </select>
+          </div>
+        </div>
+        <div class="level-item">
+          <div class="select is-small">
+          <select name="limit" id="id_limit">
+            <option value="10"{% if limit == 10 %} selected{% endif %}>10 items</option>
+            <option value="50"{% if limit == 50 %} selected{% endif %}>50</option>
+            <option value="100"{% if limit == 100 %} selected{% endif %}>100</option>
+            <option value="200"{% if limit == 200 %} selected{% endif %}>200</option>
+          </select>
+          </div>
+        </div>
+        <div class="level-item">
+            <input type="submit" class="button is-small is-info" value="Filter">
+
+        </div>
+      </div>
+    </nav>
+    </form>
+  <div class="columns">
+    <div class="column is-two-fifths hints-box">
+    <iframe name="canned_hints_frame" srcdoc='<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"><h4 style="font-family: DM Sans">Click the button to populate canned hints or previous hints here.</h4>'></iframe>
+    </div>
+    <div class="column is-three-fifths">
+
+  {% if hints|length %}
+  <table>
+    <tr>
+      <th>Puzzle & Team</th>
+      <th>Info</th>
+      <th>Claimant</th>
+    </tr>
+    {% for hint_info in hints %}
+    <tr>
+      <td class="hint-puzzle-team">
+        <a class="puzzle-link" href="{% url 'spoilr.hints:dashboard' %}?hint={{ hint_info.hint.id }}" target="_blank">{{ hint_info.hint.puzzle.name }}</a><br>
+        by <a href="{% url 'spoilr.progress:team' hint_info.hint.team.username %}" target="_blank">{{ hint_info.hint.team.name|truncatechars:40 }}</a><br>
+        <div class="sub-filter">
+        <a title="Filter by puzzle" href="?puzzle={{ hint_info.hint.puzzle.slug }}">Filter by 🧩</a><br>
+        <a title="Filter by team" href="?team={{ hint_info.hint.team.username }}">Filter by 👩‍👩‍👧‍👦</a><br>
+        <a title="Filter by puzzle and team" href="?puzzle={{ hint_info.hint.puzzle.slug }}&team={{ hint_info.hint.team.username }}&open=0&limit=200">Filter by 🧩 + 👩‍👩‍👧‍👦</a>
+        </div>
+
+      </td>
+      <td>
+        {% if is_hint %}
+        <a class="tag" href="{% url 'spoilr.hints:canned' hint_info.hint.puzzle.slug %}" target="canned_hints_frame">🥫 Canned Hints</a>
+        <a class="tag" href="{% url 'spoilr.hints:history' hint_info.hint.puzzle.slug hint_info.hint.team.username %}" target="canned_hints_frame">📜 Previous Hints</a>
+        {% endif %}
+        <a class="tag" href="/solutions/{{ hint_info.hint.puzzle.slug }}" target="_blank">🔑 Solution</a>
+        <a class="tag" href="/puzzles/{{ hint_info.hint.puzzle.slug }}" target="_blank">🧩 Puzzle</a>
+        <a class="tag" href="{% url 'admin:spoilr_hints_hint_change' hint_info.hint.id %}" target="_blank">✏️ Edit in Admin</a>
+
+        <div class="asked-answered">
+        <b>Asked:</b> <span title="{{ hint_info.hint.timestamp }}">{{ hint_info.hint.timestamp|naturaltime }}</span>
+        {% if hint_info.hint.response %}
+        <b>Answered:</b> <span title="{{ hint_info.task.update_time }}">{{ hint_info.task.update_time|naturaltime }}</span>
+        {% endif %}
+        {% if hint_info.hint.notify_emails %}
+          <br>
+          <b>Send email to:</b> <span class="contact-email">{{ hint_info.hint.notify_emails }}</span>
+        {% endif %}
+        </div>
+        {% if hint_info.total_team_puzzle_hints > 1 %}
+          <div class="past-hints-note">Team has submitted {{hint_info.total_team_puzzle_hints}} hint requests and hint clarifications for this puzzle</div>
+        {% endif %}
+      </td>
+      <td>
+        {% if hint_info.task.handler and hint_info.task.handler != request.handler %}
+        <span class='user' title='{{ hint_info.task.handler.discord }} on Discord'>{{ hint_info.task.handler.name }}</span><br>
+        <em class="claim-time" title="{{ hint_info.task.claim_time }}">{{ hint_info.task.claim_time|naturaltime }}</em>
+        {% if hint_info.task.handler.status != 'on duty' %}
+        <form method="POST" action="{% url 'spoilr.hq:task_claim' %}">
+          {% csrf_token %}
+          <input type="hidden" name="task_id" value="{{ hint_info.task.id }}">
+          <input type="hidden" name="yoink" value="1">
+          <input type="hidden" name="redirect" value="{{ hint_info.hint.id }}">
+          <input type="submit" onClick="return confirm('This will claim the task without notifying the current handler. Continue?');" value="Yoink">
+        </form>
+        {% endif %}
+        {% elif hint_info.task.handler %}
+        <form method="POST" action="{% url 'spoilr.hq:task_unclaim' %}">
+          {% csrf_token %}
+          <input type="hidden" name="task_id" value="{{ hint_info.task.id }}">
+          <input type="submit" value="Unclaim">
+        </form>
+        {% elif request.handler and request.handler.sign_in_time %}
+        <form method="POST" action="{% url 'spoilr.hq:task_claim' %}">
+          {% csrf_token %}
+          <input type="hidden" name="task_id" value="{{ hint_info.task.id }}">
+          <input type="hidden" name="redirect" value="{{ hint_info.hint.id }}">
+          <input type="submit" value="Claim">
+        </form>
+        {% else %}
+        <em>Sign in to reply to hints</em>
+        {% endif %}
+      </td>
+      </tr>
+      {% for hint in hint_info.thread.hints %}
+      <tr class="submitted-{{ hint.is_request | yesno:"request,response" }}{% if hint.is_request and hint.requires_response %} unanswered-request{% endif %}">
+          <td colspan="3" class="hint-question">
+              <div>
+                  <strong>{{ hint.is_request | yesno:"Q,A" }}</strong> ({{ hint.timestamp }}{% if not hint.is_request %} by {{ hint.handler | default:"unknown" }}{% endif %}):
+              </div>
+              <pre class="submitted-text">{{ hint.text_content }}</pre>
+          </td>
+      </tr>
+      {% endfor %}
+      <tr>
+      <td colspan="3" class="hint-response">
+      {% if not hint_info.hint.requires_response %}
+      <p>This hint has been resolved (status: {{ hint_info.hint.long_status }}). You may <a href="{% url 'admin:spoilr_hints_hint_change' hint_info.hint.id %}" target="_blank">edit the response or reopen it in Admin</a>.</p>
+      {% elif hint_info.task.handler and hint_info.task.handler == request.handler and request.handler.sign_in_time %}
+      <form action="{% url 'spoilr.hints:respond' %}" method="POST">
+        {% csrf_token %}
+        {% for hidden in hint_info.form.hidden_fields %}
+        {{ hidden }}
+        {% endfor %}
+        {% for field in hint_info.form.visible_fields %}
+        <p>
+            <div class="ten columns">{{ field }} {{ field.errors }}</div>
+        </p>
+        {% endfor %}
+
+        <table><tr>
+          <td>
+            <input type="text" name="confirm" placeholder="Enter &quot;respond&quot; to confirm" id="id_confirm_hint_response" pattern="[Rr][Ee][Ss][Pp][Oo][Nn][Dd]" required>
+          </td>
+          <td>
+            <input type="submit" value="Reply">
+          </td>
+          <td align="right" style ="vertical-align: middle;" >
+            This will resolve the hint and email the team - be careful!
+          </td>
+        </tr></table>
+
+      </form>
+      {% else %}
+      <em>No response yet</em>
+      {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p>No hints currently in the queue! Check back later.</p>
+  {% endif %}
+  </div>
+</div>
+
+</section>
+{% endblock content %}
+
+{% block stylesheets %}
+<link rel="stylesheet" type="text/css" href="{% static 'spoilr/hints/style.css' %}">
+{% endblock %}
+
+{% block scripts %}
+{% include 'hq/util/auto-submit-form-script.tmpl' with selector='.filters' %}
+{% endblock scripts %}

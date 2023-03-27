@@ -2,12 +2,28 @@
 version: '3.7'
 
 services:
+  redis:
+    command: redis-server --maxclients 500000
+  db:
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgresql.conf:/postgresql.conf
+    # enable replica and optimize for large machine
+    command: /docker-entrypoint-initdb.d/pg_hba_init.sh /docker-entrypoint.sh postgres -c config_file=/postgresql.conf
   tph:
     image: ${IMAGE_TAG}
     env_file: .env
     restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - django
     ports:
       - '${SERVER_HTTP_BIND_PREFIX}080:80'
       - '${SERVER_HTTP_BIND_PREFIX}443:443'
+      - '${SERVER_HTTP_BIND_PREFIX}443:443/udp'
     volumes:
       - ${HOME}/srv:/srv
+
+volumes:
+  pgdata:

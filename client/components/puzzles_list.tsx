@@ -1,43 +1,44 @@
 import React, { FC, useContext, useMemo } from 'react';
-import dynamic from 'next/dynamic';
 
 import Custom404 from 'pages/404';
 import { PuzzleData } from 'components/puzzle_image';
+import { RoundData, RoundProps } from 'components/puzzles_map';
 import PuzzleTable from 'components/puzzle_table';
+import Section from 'components/section';
 import { serverFetch } from 'utils/fetch';
 
-export interface Props {
-  // Map from round name to list of puzzles.
-  puzzles: Record<string, PuzzleData[]>;
-}
-
-const StoryNotifications = dynamic(
-  () => import('components/story_notifications'),
-  { ssr: false }
-);
-
-const PuzzlesList: FC<Props> = ({ puzzles }) => {
+const PuzzlesList: FC<RoundProps> = ({ puzzles, rounds }) => {
   return (
-    <div>
-      <StoryNotifications />
-      {Object.entries(puzzles).map(([round, puzzles_in_round]) => (
-        <PuzzleTable name={round} puzzles={[puzzles_in_round]} />
+    <Section className="puzzle-list rounded-md max-w-[1000px]">
+      {Object.entries(puzzles).map(([roundSlug, puzzlesInRound]) => (
+        <PuzzleTable
+          key={roundSlug}
+          roundSlug={roundSlug}
+          roundData={rounds[roundSlug]}
+          puzzles={[puzzlesInRound]}
+        />
       ))}
-    </div>
+
+      <style global jsx>{`
+        section + .puzzle-list {
+          margin-top: 60px;
+        }
+      `}</style>
+    </Section>
   );
 };
 
 export default PuzzlesList;
 export const getPuzzlesListProps = async (context) => {
-  let props: Props;
+  let props: RoundProps;
   if (process.env.isStatic) {
     try {
       props = require('assets/json_responses/puzzles.json');
     } catch {
-      props = {} as Props;
+      props = {} as RoundProps;
     }
   } else {
-    props = await serverFetch<Props>(context, '/puzzles');
+    props = await serverFetch<RoundProps>(context, '/puzzles');
   }
   return {
     props,

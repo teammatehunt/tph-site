@@ -1,0 +1,30 @@
+<script type="module">
+  let htmlTemplates = {};
+  let textTemplates = {};
+  let subjects = {};
+  {% for canned in email_templates %}
+  htmlTemplates['{{ canned.slug }}'] = `{{ canned.html_content|safe }}`;
+  textTemplates['{{ canned.slug }}'] = `{{ canned.text_content|safe }}`;
+  subjects['{{ canned.slug }}'] = `{{ canned.subject|safe }}`;
+  {% endfor %}
+
+  const emailForm = document.querySelector('.email-form');
+  const subject = document.querySelector('input[name=subject]');
+  const body = document.querySelector('textarea[name=body]');
+  const txtBody = document.querySelector('textarea[name=text_content]');
+
+  {% for canned in email_templates %}
+  document.querySelector('.{{ canned.slug }}').addEventListener('click', () => {
+    emailForm.classList.remove('hidden');
+    if (body) {
+      body.value = htmlTemplates['{{ canned.slug }}'];
+    }
+    if (txtBody) {
+      txtBody.value = textTemplates['{{ canned.slug }}'];
+    }
+    if (subject) {
+      subject.value = subjects['{{ canned.slug }}'];
+    }
+  });
+{% endfor %}
+</script>
