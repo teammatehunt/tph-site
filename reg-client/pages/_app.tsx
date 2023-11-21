@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import App, { AppProps } from 'next/app';
-import getConfig from 'next/config';
 import Error from 'next/error';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
@@ -11,10 +10,6 @@ import Error404 from 'pages/404';
 import HuntInfoContext, { EMPTY_HUNT_INFO, HuntInfo } from 'components/context';
 import { serverFetch, clientFetch } from 'utils/fetch';
 import * as ga from 'utils/google_analytics';
-
-const {
-  publicRuntimeConfig: { ASSET_PREFIX },
-} = getConfig();
 
 type Props = AppProps & {
   huntInfo: HuntInfo;
@@ -52,7 +47,9 @@ export default function MyApp({
     };
   }, [router.events]);
 
-  const origin = 'FIXME DOMAIN';
+  const origin = process.env.isStatic
+    ? `https://puzzles.mit.edu/20xx/${process.env.domainName}`
+    : `https://${process.env.domainName}`;
 
   let content;
   if (bare) {
@@ -88,7 +85,7 @@ export default function MyApp({
           property="og:image"
           content={
             /* This image needs to point to an absolute url */
-            new URL(`${ASSET_PREFIX ?? ''}/banner.png`, origin).href
+            `${origin}/banner.png`
           }
         />
         <meta property="og:url" content={origin} />
@@ -101,7 +98,7 @@ export default function MyApp({
         <link
           key="favicon"
           rel="shortcut icon"
-          href={`${ASSET_PREFIX ?? ''}/favicon.ico`}
+          href={`${router.basePath}/favicon.ico`}
           type="image/vnd.microsoft.icon"
         />
       </Head>

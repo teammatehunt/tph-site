@@ -1,0 +1,1 @@
+../../../client/pages/reset_password.tsx

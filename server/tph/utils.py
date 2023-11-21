@@ -43,9 +43,9 @@ def get_site(request, assert_set=False):
     site = None
     if settings.IS_POSTHUNT:
         # in posthunt, use the path instead of the header set by Caddy
-        if request.path.startswith(f"/2023/{settings.MAIN_HUNT_HOST}"):
+        if request.path.startswith(f"/20xx/{settings.MAIN_HUNT_HOST}"):
             site = "hunt"
-        elif request.path.startswith(f"/2023/{settings.REGISTRATION_HOST}"):
+        elif request.path.startswith(f"/20xx/{settings.REGISTRATION_HOST}"):
             site = "registration"
     else:
         site = request.META.get("HTTP_X_TPH_SITE")

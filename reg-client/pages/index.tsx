@@ -79,7 +79,7 @@ const HuntCountdown = () => {
   if (process.env.isArchive) {
     // the redirect set by /hunt doesn't allow for paths outside the basePath
     // so we have to skip the server side redirect
-    huntLink = '/2023/interestingthings.museum';
+    huntLink = '/20xx/mypuzzlehunt.com';
   }
   return (
     <>

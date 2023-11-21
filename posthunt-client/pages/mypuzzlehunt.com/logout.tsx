@@ -1,0 +1,1 @@
+../../../client/pages/logout.tsx

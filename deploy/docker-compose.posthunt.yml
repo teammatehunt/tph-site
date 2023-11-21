@@ -12,8 +12,8 @@ services:
       - ENABLE_POSTHUNT_SITE=1
       - POSTHUNT_HOST=localhost:8084
       - CADDY_POSTHUNT_HOST=localhost:8084
-      - CDN_REGISTRATION_HOST=/2023
-      - CDN_HUNT_HOST=/2023
+      - CDN_REGISTRATION_HOST=/20xx
+      - CDN_HUNT_HOST=/20xx
       - HUNT_HOST=mypuzzlehunt.com
       - REGISTRATION_HOST=registration.mypuzzlehunt.com
     ports:

@@ -1,0 +1,1 @@
+../../client/pages/404.tsx

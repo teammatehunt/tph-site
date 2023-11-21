@@ -7,13 +7,13 @@ const {
   CLIENT_STATIC_FILES_PATH,
 } = require('next/dist/shared/lib/constants.js');
 
-const IS_ARCHIVE = !!Number(process.env.ENABLE_POSTHUNT_SITE); // whether to use /2023/... path scheme for posthunt
+const IS_ARCHIVE = !!Number(process.env.ENABLE_POSTHUNT_SITE); // whether to use /20xx/... path scheme for posthunt
 const USE_ENCRYPTION_PLUGIN = !IS_ARCHIVE;
 const IS_STATIC = false; // whether to use jsons instead of a backend server
 const USE_WORKER = IS_ARCHIVE; // whether to enable the web worker for fetch and websocket emulation
 const FILENAME_HASH_LENGTH = 8; // for encrypted/
 // FIXME: Update prefix
-const STORAGE_PREFIX = '2023-'; // for cookies and localStorage
+const STORAGE_PREFIX = '20xx-'; // for cookies and localStorage
 
 const CLIENT = path.basename(process.cwd());
 
@@ -210,9 +210,9 @@ class EncryptionPlugin {
 // FIXME: update base paths
 const basePath =
   CLIENT === 'posthunt-client'
-    ? '/2023'
+    ? '/20xx'
     : IS_ARCHIVE && CLIENT === 'reg-client'
-    ? '/2023/registration.mypuzzlehunt.com'
+    ? '/20xx/registration.mypuzzlehunt.com'
     : '';
 
 module.exports = {
@@ -468,6 +468,5 @@ module.exports = {
   // Runtime env variables
   publicRuntimeConfig: {
     GOOGLE_ANALYTICS_ID: process.env.GOOGLE_ANALYTICS_ID,
-    ASSET_PREFIX: process.env.ASSET_PREFIX,
   },
 };

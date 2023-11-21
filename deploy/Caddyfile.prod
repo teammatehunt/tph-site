@@ -56,7 +56,7 @@
         not path /_next/static/*
         not path /banner.png
         not path /favicon.ico
-        not path /mh2023_activity_log.csv
+        not path /mh20xx_activity_log.csv
     }
 
     # these endpoints are targets for prometheus and are protected by basicauth
@@ -352,57 +352,57 @@
 # FIXME: update paths
 {$CADDY_POSTHUNT_HOST:http://no-posthunt} {
     @posthunt_hunt {
-        path /2023/mypuzzlehunt.com
-        path /2023/mypuzzlehunt.com/*
+        path /20xx/mypuzzlehunt.com
+        path /20xx/mypuzzlehunt.com/*
     }
     @posthunt_registration {
-        path /2023/registration.mypuzzlehunt.com
-        path /2023/registration.mypuzzlehunt.com/*
+        path /20xx/registration.mypuzzlehunt.com
+        path /20xx/registration.mypuzzlehunt.com/*
     }
     @posthunt_hunt_clientnav {
-        path_regexp ^/2023/_next/data/[^/]*/interestingthings\.museum/
+        path_regexp ^/20xx/_next/data/[^/]*/mypuzzlehunt\.com/
     }
     @posthunt_root {
-        path /2023
-        path /2023/*
+        path /20xx
+        path /20xx/*
         not {
-            path /2023/mypuzzlehunt.com
-            path /2023/mypuzzlehunt.com/*
-            path /2023/mypuzzlehunt2.com
-            path /2023/mypuzzlehunt2.com/*
-            path /2023/registration.mypuzzlehunt.com
-            path /2023/registration.mypuzzlehunt.com/*
+            path /20xx/mypuzzlehunt.com
+            path /20xx/mypuzzlehunt.com/*
+            path /20xx/mypuzzlehunt2.com
+            path /20xx/mypuzzlehunt2.com/*
+            path /20xx/registration.mypuzzlehunt.com
+            path /20xx/registration.mypuzzlehunt.com/*
         }
-        not path_regexp ^/2023/_next/data/[^/]*/mypuzzlehunt\.com/
-        not path_regexp ^/2023/_next/data/[^/]*/mypuzzlehunt2\.com/
+        not path_regexp ^/20xx/_next/data/[^/]*/mypuzzlehunt\.com/
+        not path_regexp ^/20xx/_next/data/[^/]*/mypuzzlehunt2\.com/
     }
     vars @posthunt_hunt {
         frontend_port 3000
         site museum
         site_static posthunt
         site_type hunt
-        basepath /2023/mypuzzlehunt.com
+        basepath /20xx/mypuzzlehunt.com
     }
     vars @posthunt_registration {
         frontend_port 3002
         site registration
         site_static registration
         site_type registration
-        basepath /2023/registration.mypuzzlehunt.com
+        basepath /20xx/registration.mypuzzlehunt.com
     }
     vars @posthunt_hunt_clientnav {
         frontend_port 3000
         site museum
         site_static posthunt
         site_type hunt
-        basepath /2023
+        basepath /20xx
     }
     vars @posthunt_root {
         frontend_port 3000
         site hunt
         site_static posthunt
         site_type hunt
-        basepath /2023
+        basepath /20xx
     }
 
     # combined posthunt needs special routing, so have to split main_entrypoint
@@ -410,24 +410,24 @@
 
     # Placeholders don't work with uri strip_prefix for some reason.
     handle @posthunt_hunt {
-        uri strip_prefix /2023/mypuzzlehunt.com
+        uri strip_prefix /20xx/mypuzzlehunt.com
         import main_entrypoint_directives
     }
     handle @posthunt_registration {
-        uri strip_prefix /2023/registration.mypuzzlehunt.com
+        uri strip_prefix /20xx/registration.mypuzzlehunt.com
         import main_entrypoint_directives
     }
     handle @posthunt_hunt_clientnav {
-        uri strip_prefix /2023
+        uri strip_prefix /20xx
         import main_entrypoint_directives
     }
     handle @posthunt_root {
-        uri strip_prefix /2023
+        uri strip_prefix /20xx
         import main_entrypoint_directives
     }
-    # redirect posthunt domain root to 2023 landing page
+    # redirect posthunt domain root to 20xx landing page
     handle / {
-        redir * /2023
+        redir * /20xx
     }
     error 404
 }

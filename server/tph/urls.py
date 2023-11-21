@@ -143,9 +143,23 @@ if settings.DEBUG:
 else:
     handler404 = "puzzles.views.views.handler404"
 
-urlpatterns.extend(
-    [
-        path("admin/", admin.site.urls),
-        path("spoilr/", include("spoilr.urls")),
+if settings.IS_POSTHUNT:
+    urlpatterns = [
+        path(f"20xx/{settings.MAIN_HUNT_HOST}/", include(urlpatterns)),
+        path(f"20xx/{settings.REGISTRATION_HOST}/", include(urlpatterns)),
     ]
-)
+
+    urlpatterns.extend(
+        [
+            path("20xx/admin/", admin.site.urls),
+            path("20xx/spoilr/", include("spoilr.urls")),
+        ]
+    )
+
+else:
+    urlpatterns.extend(
+        [
+            path("admin/", admin.site.urls),
+            path("spoilr/", include("spoilr.urls")),
+        ]
+    )

@@ -22,7 +22,7 @@ def generate_url(type, path, query={}):
     path = path.lstrip("/")
     if settings.IS_POSTHUNT:
         # in posthunt, we change the different hosts to be base paths instead of domains
-        base_url = f"/2023/{host}"
+        base_url = f"/20xx/{host}"
     else:
         base_url = f"https://{host}"
     if path:

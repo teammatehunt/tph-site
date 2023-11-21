@@ -7,4 +7,4 @@ import platform
 IS_PYODIDE = platform.system() == "Emscripten"
 # prefix for indexeddb files
 # FIXME
-INDEXEDDB_PREFIX = "2023-"
+INDEXEDDB_PREFIX = "20xx-"

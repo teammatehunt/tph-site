@@ -9,7 +9,7 @@ from pathlib import Path
 import zipfile
 
 # FIXME
-INDEXEDDB_PREFIX = "2023-"
+INDEXEDDB_PREFIX = "20xx-"
 os.environ["SERVER_HOSTNAME"] = "mypuzzlehunt.com"
 os.makedirs("/srv", exist_ok=True)
 print("Caching site packages")

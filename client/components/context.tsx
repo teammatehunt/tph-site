@@ -25,7 +25,7 @@ export interface HuntInfo {
     startTime: string;
     secondsToStartTime: number;
     endTime: string;
-    closeTime: string;
+    closeTime?: string;
     hintReleaseTime: string;
     toggle?: string;
     worker?: string;

@@ -1,7 +1,7 @@
 import HuntInfoContext from 'components/context';
 import { GetServerSidePropsContext, NextPageContext } from 'next';
 import { NextRouter } from 'next/router';
-import { useRouter } from 'utils/router';
+import { Router, useRouter } from 'utils/router';
 import {
   useCallback,
   useContext,
@@ -41,7 +41,7 @@ export const addDecryptionKeys = <T>({
   return rest;
 };
 
-// extract the /2023/interestingthings.museum etc
+// extract the /20xx/mypuzzlehunt.com etc
 // note that this gets called by the router in utils/router and thus that
 // router should use router.basePath directly
 export const getBasePath = (context: NextRouter | NextPageContext | GetServerSidePropsContext) : string => {
@@ -51,12 +51,43 @@ export const getBasePath = (context: NextRouter | NextPageContext | GetServerSid
   let basePath = (rootBasePath + pathname).split('/').slice(0, 3).join('/');
   // NB: tree shaking ensures these are not in the source when isArchive is false
   const allowedBasePaths = [
-    'FIXME',
+    '/20xx/mypuzzlehunt.com',
+    '/20xx/registration.mypuzzlehunt.com',
   ];
   if (!allowedBasePaths.includes(basePath)) {
     basePath = allowedBasePaths[0];
   }
   return basePath;
+};
+
+// Simulate fetch /api/hunt_info from the Next.js server to the Django server
+// while building the static site. This function is synchronous.
+// NB: GetStaticPropsContext doesn't have pathname in Next.js but we patch the
+//     render function to include pathname during export
+export const fetchHuntInfoStaticSync = <T>(
+  router: Router,
+) : StatusCode & T => {
+  if (!process.env.isStatic) {
+    throw new Error('called fetchStaticSync when not generating the static site');
+  } else {
+    // NB: needs conditional guard because webpack won't deduce that throwing exits
+    const basePath = router.basePath;
+    // use dumped api response for the static site
+    // NB: these are loaded individually and explicitly so that Next.js does not
+    //     try to pull in all possible asset paths
+    // FIXME: replace 20xx and domains
+    const data = {
+      '/20xx/mypuzzlehunt.com': require('assets/json_responses/20xx/mypuzzlehunt.com/api/hunt_info'),
+      '/20xx/registration.mypuzzlehunt.com': require('assets/json_responses/20xx/registration.mypuzzlehunt.com/api/hunt_info'),
+    }[basePath];
+    if (data === undefined) {
+      throw new Error('did not find api response json');
+    }
+    return {
+      statusCode: 200,
+      ...data,
+    };
+  }
 };
 
 export const serverFetch = async <T>(

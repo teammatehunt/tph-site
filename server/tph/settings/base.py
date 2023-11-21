@@ -18,7 +18,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "FIXME_CHANGE_THIS_INSECURE_SECRET_KEY
 # key for encrypted js files -- keep in sync with client/next.config.js
 JS_ENCRYPTION_KEY = "FIXME_replace_WITH_a_NEW_key_SYNCED_between_NEXTJS_and_PYTHON"
 # to disambiguate between multiple Hunts on the archive site
-COOKIE_PREFIX = "FIXME YEAR-"
+COOKIE_PREFIX = "20xx-"  # FIXME
 
 # setting for posthunt infra for statification. prefer using
 # puzzles.views.auth.restrict_access for most posthunt conditioning

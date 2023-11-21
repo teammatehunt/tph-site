@@ -22,6 +22,15 @@
 # dev .env file
 /.env
 
+# posthunt build files
+/posthunt/build
+/posthunt/exported_static_site*
+/posthunt/site_dump*
+/posthunt/staticfiles_cache*
+
+# Database dumps
+*.dump.gz
+
 # pyc files and cache
 *.pyc
 __pycache__/

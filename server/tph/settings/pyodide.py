@@ -3,8 +3,8 @@ import os
 # set environment variables before loading from settings.base
 # FIXME
 os.environ["ENABLE_POSTHUNT_SITE"] = "1"
-os.environ["CDN_REGISTRATION_HOST"] = "/2023"
-os.environ["CDN_HUNT_HOST"] = "/2023"
+os.environ["CDN_REGISTRATION_HOST"] = "/20xx"
+os.environ["CDN_HUNT_HOST"] = "/20xx"
 os.environ["MAIN_HUNT_HOST"] = "mypuzzlehunt.com"
 os.environ["REGISTRATION_HOST"] = "register.mypuzzlehunt.com"
 

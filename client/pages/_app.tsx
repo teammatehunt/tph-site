@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import App, { AppContext, AppProps } from 'next/app';
-import getConfig from 'next/config';
 import Error from 'next/error';
 import Head from 'next/head';
 import { useRouter } from 'utils/router';
@@ -17,15 +16,16 @@ import Layout from 'components/layout';
 import HuntInfoContext, { EMPTY_HUNT_INFO, HuntInfo } from 'components/context';
 import HuntNotifications from 'components/hunt_notifications';
 import { initBuildManifestProxy } from 'utils/buildManifestProxy';
-import { serverFetch, clientFetch, addDecryptionKeys } from 'utils/fetch';
+import {
+  serverFetch,
+  clientFetch,
+  addDecryptionKeys,
+  fetchHuntInfoStaticSync,
+} from 'utils/fetch';
 import { dragPatch } from 'utils/dragpatch';
 import * as ga from 'utils/google_analytics';
 import { createWorker } from 'utils/worker';
 import { useSessionUuid } from 'utils/uuid';
-
-const {
-  publicRuntimeConfig: { ASSET_PREFIX },
-} = getConfig();
 
 type Props = AppProps & {
   huntInfo: HuntInfo;
@@ -45,12 +45,10 @@ export default function MyApp({
   huntInfo,
   cookies = {},
 }: Props) {
+  const router = useRouter();
   if (process.env.isStatic) {
-    try {
-      huntInfo = require('assets/json_responses/hunt_info.json');
-    } catch {
-      huntInfo = EMPTY_HUNT_INFO;
-    }
+    huntInfo = fetchHuntInfoStaticSync<HuntInfo>(router);
+    cookies = nextCookies({}) as Record<string, string>;
   }
 
   // Set global on client to allow decrypting.
@@ -75,7 +73,6 @@ export default function MyApp({
     bare = false,
   } = pageProps;
 
-  const router = useRouter();
   const uuid = useSessionUuid();
 
   // note huntInfo here is the { huntInfo, userInfo } object.
@@ -119,8 +116,6 @@ export default function MyApp({
     },
   };
 
-  const origin = `https://${process.env.domainName}`;
-
   let content;
   if (bare) {
     content = (
@@ -148,6 +143,10 @@ export default function MyApp({
     );
   }
 
+  const origin = process.env.isStatic
+    ? `https://puzzles.mit.edu/20xx/${process.env.domainName}`
+    : `https://${process.env.domainName}`;
+
   return (
     <>
       <Head>
@@ -162,7 +161,7 @@ export default function MyApp({
           property="og:image"
           content={
             /* This image needs to point to an absolute url */
-            new URL(`${ASSET_PREFIX ?? ''}/banner.png`, origin).href
+            `${origin}/banner.png`
           }
         />
         <meta property="og:url" content={origin} />
@@ -175,7 +174,7 @@ export default function MyApp({
         <link
           key="favicon"
           rel="shortcut icon"
-          href={`${ASSET_PREFIX ?? ''}/favicon.ico`}
+          href={`${router.basePath}/favicon.ico`}
           type="image/vnd.microsoft.icon"
         />
       </Head>
