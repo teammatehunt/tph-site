@@ -6,7 +6,6 @@ import HuntInfoContext from 'components/context';
 import Section from 'components/section';
 import Title from 'components/title';
 import { formattedDateTime } from 'utils/timer';
-import StoryNotifications from 'components/story_notifications';
 
 const Faq = () => {
   const { huntInfo } = useContext(HuntInfoContext);
@@ -15,7 +14,6 @@ const Faq = () => {
   return (
     <>
       <Title title="FAQ" subline="Learn More About Our Attractions" />
-      <StoryNotifications onlyFinished />
 
       <Section
         narrow

@@ -42,9 +42,10 @@ export const addDecryptionKeys = <T>({
 };
 
 // extract the /20xx/mypuzzlehunt.com etc
-// note that this gets called by the router in utils/router and thus that
-// router should use router.basePath directly
-export const getBasePath = (context: NextRouter | NextPageContext | GetServerSidePropsContext) : string => {
+// Note that this gets called by the router in utils/router and thus that
+// router should use router.basePath directly unless also needing error validation.
+// The input to this should be a Next.js router or context, not our Router proxy.
+export const getBasePath = (context: NextRouter | NextPageContext | GetServerSidePropsContext, errIfInvalid=false) : string => {
   const rootBasePath = process.env.basePath ?? '';
   if (!process.env.isArchive) return rootBasePath;
   const pathname = 'pathname' in context ? context.pathname : context.resolvedUrl;
@@ -55,6 +56,9 @@ export const getBasePath = (context: NextRouter | NextPageContext | GetServerSid
     '/20xx/registration.mypuzzlehunt.com',
   ];
   if (!allowedBasePaths.includes(basePath)) {
+    if (errIfInvalid) {
+      throw new Error(`Invalid base path from concatenating "${rootBasePath}" and "${pathname}"`);
+    }
     basePath = allowedBasePaths[0];
   }
   return basePath;
@@ -90,18 +94,48 @@ export const fetchHuntInfoStaticSync = <T>(
   }
 };
 
+// perform a fetch from the Next.js server to the Django server
 export const serverFetch = async <T>(
   context,
   endpoint: string,
-  options: object = { method: 'GET' }
+  options: any = { method: 'GET' }
 ): Promise<StatusCode & T> => {
   if (typeof window !== 'undefined') {
     throw new Error('called serverFetch from a browser!');
   }
+  // NB: GetStaticPropsContext doesn't have pathname in Next.js but we patch the
+  //     render function to include pathname during export
   const basePath = getBasePath(context);
+
+  const path = basePath + '/api' + endpoint;
+
+  if (process.env.isStatic) {
+    // Simulate performing a fetch from the Next.js server to the Django server
+    // while building the static site.
+    if (options.method !== 'GET') {
+      throw new Error(`serverFetch ${endpoint} must be used with method GET`);
+    }
+    // use dumped api response for the static site
+    let data;
+    try {
+      // `?` are converted to `+` so that require doesn't chop off the query
+      data = await import(`assets/json_responses${path.replace(/\?/g, "+")}`);
+    } catch {
+      console.warn(`No response for ${path}`);
+      // 404 if not found
+      return {
+        statusCode: 404,
+      } as StatusCode & T;
+    }
+    return Promise.resolve({
+      statusCode: 200,
+      ...data,
+    });
+  }
+
   // Constructing a URL object is required to make URLs with emojis work
   // (i.e. fetching info for a team with emojis in its name).
-  const url = new URL(SERVER_ENDPOINT + basePath + '/api' + endpoint);
+  const url = new URL(SERVER_ENDPOINT + path);
   const response = await fetch(url.toString(), {
     headers: {
       cookie: context.req.headers.cookie,

@@ -1,3 +1,5 @@
+const INDEXEDDB_PREFIX = '20xx-';
+
 const IS_SHARED_WORKER = (
   typeof SharedWorkerGlobalScope !== 'undefined' &&
   self instanceof SharedWorkerGlobalScope
@@ -15,20 +17,29 @@ function uuidv4() {
 // fetched correctly.)
 const requirements = {
   // organized by `import_name: package_name`
-  // Pyodide built-ins
-  'PIL.Image': 'Pillow',
-  yaml: 'pyyaml',
+  // Pyodide stdlib built-ins
+  sqlite3: 'sqlite3',
+  typing_extensions: 'typing_extensions',
+  // Pyodide PyPi built-ins
+  dateutil: 'python_dateutil',
+  'PIL.Image': 'pillow',
   pytz: 'pytz',
+  svgwrite: 'svgwrite',
+  yaml: 'pyyaml',
   // PyPi
-  django: 'Django==3.1.7',
+  django: 'Django==4.0.7',
+  django_bleach: 'django-bleach==1.0.0',
+  django_extensions: 'django-extensions==3.1.5',
+  phonenumber_field: 'django-phonenumber-field[phonenumberslite]==7.0.0',
   ratelimit: 'django-ratelimit==3.0.0',
-  html2text: 'html2text==2020.1.16',
-  importlib_resources: 'importlib_resources==5.2.2',
-  markdown: 'Markdown==3.2.2',
-  dateutil: 'python-dateutil==2.8.1',
-  redis: 'redis==3.5.3',
-  requests: 'requests==2.25.1',
   emoji: 'emoji==1.2.0', // server version is 1.5.0
+  html2text: 'html2text==2020.1.16',
+  markdown: 'Markdown==3.2.2',
+  polygenerator: 'polygenerator==0.2.0',
+  redis: 'redis==4.3.4',
+  requests: 'requests==2.25.1',
+  tzdata: 'tzdata==2022.7', // pyodide does not have built in system timezones
+  unidecode: 'unidecode==1.3.4',
 };
 
 /*
@@ -51,8 +62,7 @@ if (IS_SHARED_WORKER) {
   self.broadcastChannel = self;
 }
 
-// const indexURL = 'https://cdn.jsdelivr.net/pyodide/v0.18.1/full/';
-const indexURL = '/pyodide/v0.18.1/';
+const indexURL = '/20xx/pyodide/v0.22.1/';
 
 const syncFsPromise = (self) => {
   return new Promise((success, reject) => {
@@ -81,13 +91,13 @@ async function loadPyodideAndPackages() {
       fullStdLib: false,
     });
     console.log('Loading cache');
-    self.pyodide.FS.mkdir('/indexeddb');
-    self.pyodide.FS.mount(self.pyodide.FS.filesystems.IDBFS, {}, '/indexeddb');
+    self.pyodide.FS.mkdir(`/${INDEXEDDB_PREFIX}indexeddb`);
+    self.pyodide.FS.mount(self.pyodide.FS.filesystems.IDBFS, {}, `/${INDEXEDDB_PREFIX}indexeddb`);
     const syncPromise = syncFsPromise(self);
     console.log('Awaiting sync')
     await syncPromise;
     console.log('Synced')
-    // TODO: move into pyodide_entrypoint
+    // download and install pyodide, python dependencies, and server code
     await self.pyodide.runPythonAsync(`
     import importlib
     import logging
@@ -95,28 +105,25 @@ async function loadPyodideAndPackages() {
     import sys
     import zipfile
     import js
-    sys.path.append('/indexeddb/site-packages.zip')
-    sys.path.append('/server.zip')
+    sys.path.append('/${INDEXEDDB_PREFIX}indexeddb/site-packages.zip')
+    sys.path.append('/${INDEXEDDB_PREFIX}server.zip')
     sys_packages = []
     os.environ['SETUPTOOLS_USE_DISTUTILS'] = 'local'
     try:
-      with zipfile.ZipFile('/indexeddb/immovable-site-packages.zip') as zipf:
-        site_packages = '/lib/python3.9/site-packages'
+      with zipfile.ZipFile('/${INDEXEDDB_PREFIX}indexeddb/immovable-packages.zip') as zipf:
+        package_root = '/lib/python3.10'
         for name in zipf.namelist():
-          if not os.path.isfile(os.path.join(site_packages, name)):
-            zipf.extract(name, site_packages)
+          if not os.path.isfile(os.path.join(package_root, name)):
+            zipf.extract(name, package_root)
     except Exception as e:
       logging.warn(e)
     print('Checking packages')
-    for pkg, override in [
-      ('micropip', None),
-      ('setuptools', None),
-    ]:
+    for pkg in (
+      'micropip',
+      'setuptools',
+    ):
       try:
-        if override is not None:
-          override()
-        else:
-          importlib.import_module(pkg)
+        importlib.import_module(pkg)
       except ImportError as e:
         logging.warn(e)
         logging.warn(pkg)
@@ -134,9 +141,9 @@ async function loadPyodideAndPackages() {
     if packages:
       tasks.append(micropip.install(packages))
     print('Fetching server code')
-    response = await js.fetch('/api/server.zip')
+    response = await js.fetch('/20xx/mypuzzlehunt.com/api/server.zip')
     js_buffer = await response.arrayBuffer()
-    with open('/server.zip', 'wb') as f:
+    with open('/${INDEXEDDB_PREFIX}server.zip', 'wb') as f:
       f.write(js_buffer.to_py())
     print('Awaiting python install')
     for task in tasks:
@@ -184,23 +191,48 @@ const onmessage = (port) => (event) => {
         port.postMessage(reply);
       }
       break;
+    case 'websocket-groups':
+      {
+        const {url} = event.data;
+        const pathname = new URL(url, 'http://dummy-host').pathname;
+        const id = uuidv4();
+        self.context.set(id, { url });
+        const groups = await self.pyodide.runPythonAsync(`
+        import js
+        import pyodide
+        from puzzles.consumers import ClientConsumer
+        context = js.globalThis.context['${id}'].to_py()
+        consumer = ClientConsumer()
+        await consumer.setup(context['url'])
+        pyodide.ffi.to_js(list(consumer.group_names))
+        `);
+        self.context.delete(id);
+        port.postMessage({
+          type: 'websocket-groups',
+          url,
+          groups,
+        });
+      }
+      break;
     case 'websocket':
       {
         const {url, data} = event.data;
-        const pathname = new URL(url, 'https://teamamtehunt.com').pathname;
+        const pathname = new URL(url, 'http://dummy-host').pathname;
         const regexPuzzlePath = /\/puzzles\/([^\/]+)/;
         const match = pathname.match(regexPuzzlePath);
         // let puzzle : string | undefined = undefined;
         let puzzle;
         if (match) puzzle = match[1];
         const id = uuidv4();
-        self.context.set(id, { data, puzzle });
+        self.context.set(id, { data, puzzle, url });
         await syncFsPromise(self).catch(() => {});
-        self.pyodide.runPython(`
+        await self.pyodide.runPythonAsync(`
         import js
         from puzzles.consumers import ClientConsumer
         context = js.globalThis.context['${id}'].to_py()
-        ClientConsumer().receive_json(
+        consumer = ClientConsumer()
+        await consumer.setup(context['url'])
+        await consumer.receive_json(
           context['data'],
           puzzle_slug_override=context['puzzle'],
         )
@@ -219,7 +251,7 @@ const onmessage = (port) => (event) => {
         import pyodide
         context = js.globalThis.context['${id}'].to_py()
         from tph.utils import get_mock_response
-        js.globalThis.context['${id}'].response = pyodide.to_js(
+        js.globalThis.context['${id}'].response = pyodide.ffi.to_js(
           get_mock_response(**context),
           dict_converter=js.Object.fromEntries,
         )

@@ -32,6 +32,7 @@ services:
       - /app/reg-client/node_modules # ignore host node_modules
       - /app/client/.next # ignore host .next
       - /app/reg-client/.next # ignore host .next
+      - /app/posthunt-client/.next # ignore host .next
       - ./client/.docker.yarnrc:/app/client/.yarnrc:ro
       - srv_dev:/srv
       - ./deploy/Caddyfile.dev:/Caddyfile:ro

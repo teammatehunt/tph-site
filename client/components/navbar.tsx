@@ -27,7 +27,11 @@ const NavbarLink: React.FC<Props> = ({
   dropdownItems = [],
 }) => {
   const router = useRouter();
-  const isSelected = href === router.pathname && (!as || as === router.asPath);
+  const rstrip = (path: string | undefined) =>
+    path ? path.replace(/\/$/, '') : path;
+  const isSelected =
+    rstrip(href) === rstrip(router.pathname) &&
+    (!as || rstrip(as.toString()) === rstrip(router.asPath));
 
   const linkComponent =
     dropdownItems.length > 0 ? (

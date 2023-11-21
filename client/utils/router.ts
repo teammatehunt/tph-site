@@ -17,6 +17,12 @@ export const prependSecondaryBasePath = (router, path) => {
 
 export const sanitizePath = (router, path) => {
   let sanitized;
+  try {
+    // if path is a full url (eg, starts with https://), return the url without modification
+    new URL(path);
+    return path;
+  } catch {
+  }
   if (path.startsWith(router.nextRouter.basePath)) {
     // path is the complete path
     sanitized = path.slice(router.nextRouter.basePath.length);

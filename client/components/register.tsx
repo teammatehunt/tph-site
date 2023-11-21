@@ -10,8 +10,6 @@ import { clientFetch } from 'utils/fetch';
 import { DjangoFormResponse, DjangoFormErrors } from 'types';
 import { FormRow } from 'components/form';
 
-import { AlertCircle } from 'react-feather';
-
 export interface TeamMembersForm {
   name1?: string;
   name2?: string;
@@ -101,9 +99,7 @@ export const TeamMemberFields: FunctionComponent<{
                     // FIXME: update email
                     ' Send an email to resubscribe@mypuzzlehunt.com from this address to resubscribe.'
                   }
-                >
-                  <AlertCircle />
-                </div>
+                />
                 <ReactTooltip />
               </div>
             )}

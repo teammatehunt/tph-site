@@ -11,6 +11,7 @@ import Page404 from 'pages/404';
 
 import { serverFetch } from 'utils/fetch';
 import { formattedDateTime, displayTimeLeft, sortTime } from 'utils/timer';
+import { generateGetStaticPaths } from 'utils/static';
 
 interface SolverData {
   team: string;
@@ -203,23 +204,16 @@ export default Stats;
 export const getServerSideProps = async (context) => {
   const { params } = context;
   const { slug } = params || {};
-  let props: any;
-  if (process.env.isStatic) {
-    props = require(`assets/json_responses/stats/${slug}.json`);
-  } else {
-    props = {
-      statsData: await serverFetch<StatsData>(context, `/stats/${slug}`),
-      slug,
-    };
-  }
+  const props = {
+    statsData: await serverFetch<StatsData>(context, `/stats/${slug}`),
+    slug,
+  };
 
   return {
     props,
   };
 };
 
-/*
-export const getStaticPaths = async () => {
-  return require('assets/json_responses/puzzle_paths.json');
-};
-*/
+export const getStaticPathsInStaticExport = generateGetStaticPaths(
+  import.meta.url
+);

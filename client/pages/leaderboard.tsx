@@ -6,8 +6,6 @@ import Title from 'components/title';
 import { serverFetch } from 'utils/fetch';
 import { formattedDateTime } from 'utils/timer';
 
-import StoryNotifications from 'components/story_notifications';
-
 interface Props {
   teams: Team[];
 }
@@ -60,7 +58,6 @@ const Leaderboard = ({ teams }) => {
   return (
     <>
       <Title title="Guests" subline="Come One, Come All!" />
-      <StoryNotifications onlyFinished />
       <Section>
         <div className="section">
           {showScrollPointer && (

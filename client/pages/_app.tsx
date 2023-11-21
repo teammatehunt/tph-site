@@ -54,7 +54,11 @@ export default function MyApp({
   // Set global on client to allow decrypting.
   // We want this to happen at the start of first render to ensure it's
   // available before other scripts can run.
-  if (typeof window !== 'undefined') {
+  if (
+    typeof window !== 'undefined' &&
+    process.env.useEncryptionPlugin &&
+    !process.env.isStatic
+  ) {
     (window as unknown as any).CryptoJS = {
       AES: cryptoAES,
       enc: { Hex: cryptoHex, Utf8: cryptoUtf8 },
@@ -190,6 +194,7 @@ export default function MyApp({
   );
 }
 
+// STATIC_SITE_REMOVE_START
 MyApp.getInitialProps = async (appContext: AppContext) => {
   let huntInfo: HuntInfo;
   let domain: string = '';
@@ -205,18 +210,9 @@ MyApp.getInitialProps = async (appContext: AppContext) => {
     // another way or build a custom _error.tsx component with getInitialProps.
     huntInfo = EMPTY_HUNT_INFO;
   } else if (typeof window === 'undefined') {
-    if (process.env.isStatic) {
-      // TODO: figure out what to do with the domain in the static case
-      try {
-        huntInfo = require('assets/json_responses/hunt_info.json');
-      } catch {
-        huntInfo = EMPTY_HUNT_INFO;
-      }
-    } else {
-      huntInfo = await serverFetch<HuntInfo>(appContext.ctx, '/hunt_info', {
-        method: 'GET',
-      });
-    }
+    huntInfo = await serverFetch<HuntInfo>(appContext.ctx, '/hunt_info', {
+      method: 'GET',
+    });
   } else {
     huntInfo = await clientFetch<HuntInfo>(
       appContext.ctx,
@@ -238,3 +234,4 @@ MyApp.getInitialProps = async (appContext: AppContext) => {
     ...appProps,
   };
 };
+// STATIC_SITE_REMOVE_END

@@ -138,13 +138,8 @@ const UnlockForm: React.FC<Props> = ({ rounds, currency, used }) => {
 export default UnlockForm;
 
 export const getServerSideProps = async (context) => {
-  let props: Props;
-  if (process.env.isStatic) {
-    props = require('assets/json_responses/free_unlock.json');
-  } else {
-    props = await serverFetch<Props>(context, '/free_unlock', {
-      method: 'GET',
-    });
-  }
+  const props = await serverFetch<Props>(context, '/free_unlock', {
+    method: 'GET',
+  });
   return { props };
 };

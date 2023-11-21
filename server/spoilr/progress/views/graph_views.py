@@ -3,6 +3,7 @@ import colorsys
 import datetime
 import random
 
+from django.conf import settings
 from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -135,8 +136,8 @@ def solve_graph_view(request):
         "spoilr/progress/solves.tmpl",
         {
             "sites": {
-                "museum": generate_url("museum", ""),
-                "factory": generate_url("factory", ""),
+                "hunt": generate_url("hunt", ""),
+                "base_prefix": "/20xx" if settings.IS_POSTHUNT else "",
             },
             "hint_counts_for_chartjs": {
                 "datasets": [

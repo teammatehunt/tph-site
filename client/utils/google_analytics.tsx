@@ -1,8 +1,9 @@
 import getConfig from 'next/config';
 
-export const {
-  publicRuntimeConfig: { GOOGLE_ANALYTICS_ID },
-} = getConfig();
+const nextConfig = getConfig();
+export const GOOGLE_ANALYTICS_ID = process.env.isStatic
+  ? process.env.GOOGLE_ANALYTICS_ID
+  : nextConfig.publicRuntimeConfig.GOOGLE_ANALYTICS_ID;
 
 // log the pageview with their URL
 export const pageview = (url) => {

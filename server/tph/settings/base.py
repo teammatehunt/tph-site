@@ -164,6 +164,7 @@ MIDDLEWARE = list(
             not IS_PYODIDE and "impersonate.middleware.ImpersonateMiddleware",
             "puzzles.messaging.log_request_middleware",
             "puzzles.context.context_middleware",
+            IS_POSTHUNT and not IS_PYODIDE and "tph.utils.dump_api_json_middleware",
             not IS_PYODIDE and "django_prometheus.middleware.PrometheusAfterMiddleware",
         ],
     )

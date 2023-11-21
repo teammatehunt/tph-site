@@ -86,6 +86,27 @@ def get_client():
     return Client()
 
 
+def dump_api_json_middleware(get_response):
+    "Dump api json to local disk. This is used to fill serverFetch on the static site."
+
+    def middleware(request):
+        response = get_response(request)
+        # matcher for requests from the Next.js server
+        if request.META["HTTP_HOST"] == "django:8000":
+            if request.context.team and request.context.team.is_public:
+                json_dir = Path(settings.SRV_DIR) / "json_responses"
+                # convert "?" to "+" so that javascript imports can work
+                path = json_dir / (
+                    request.get_full_path().lstrip("/").replace("?", "+") + ".json"
+                )
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("wb") as f:
+                    f.write(response.content)
+        return response
+
+    return middleware
+
+
 if not settings.IS_PYODIDE:
     from celery.utils.log import get_task_logger
     from django.contrib.staticfiles.storage import staticfiles_storage

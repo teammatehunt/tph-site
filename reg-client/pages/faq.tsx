@@ -157,9 +157,13 @@ const Faq = () => {
                 <>
                   The Museum of Interesting Things is best enjoyed with up to 60
                   friends. Looking for a group to go with?{' '}
-                  <Link href="/register-individual">
-                    <a>Let us know,</a>
-                  </Link>{' '}
+                  {process.env.isArchive ? (
+                    'Let us know,'
+                  ) : (
+                    <Link href="/register-individual">
+                      <a>Let us know,</a>
+                    </Link>
+                  )}{' '}
                   and we’ll find you a group to join.
                 </>
               }

@@ -146,13 +146,8 @@ const FreeAnswerForm: React.FC<Props> = ({ rounds, currency, used }) => {
 export default FreeAnswerForm;
 
 export const getServerSideProps = async (context) => {
-  let props: Props;
-  if (process.env.isStatic) {
-    props = require('assets/json_responses/free_answer.json');
-  } else {
-    props = await serverFetch<Props>(context, '/free_answer', {
-      method: 'GET',
-    });
-  }
+  const props = await serverFetch<Props>(context, '/free_answer', {
+    method: 'GET',
+  });
   return { props };
 };

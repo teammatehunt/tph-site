@@ -54,7 +54,7 @@ const Layout: React.FC<Props> = ({ children }) => {
 
   const prehunt = huntInfo.secondsToStartTime > 0;
   let loginUrl = '/login';
-  if (!['/login', '/'].includes(router.pathname)) {
+  if (!['/login', ''].includes(router.pathname.replace(/\/$/, ''))) {
     loginUrl += `?next=${encodeURIComponent(router.asPath)}`;
   }
 

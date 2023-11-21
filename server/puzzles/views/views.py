@@ -102,7 +102,7 @@ def get_hunt_info(request):
             0, (request.context.start_time - timezone.now()).total_seconds()
         ),
         "endTime": get_site_end_time(),
-        "closeTime": get_site_close_time(),
+        # "closeTime": get_site_close_time(),
         "hintReleaseTime": request.context.hint_time,
     }
     if request.context.site:
@@ -814,10 +814,11 @@ def _get_server_zip():
                 relpath = os.path.relpath(path, server_dir)
                 if any(
                     (
-                        relpath.startswith("fixtures/"),
-                        relpath.startswith("puzzles/migrations"),
-                        relpath.startswith("puzzles/static"),
+                        relpath.startswith("puzzles/migrations/"),
+                        relpath.startswith("puzzles/static/"),
+                        relpath.startswith("puzzles/static_root/"),
                         relpath.startswith("static/"),
+                        relpath.startswith("tph/fixtures/"),
                         relpath.startswith("tph/secrets.py"),
                         relpath.endswith(".npz"),
                         relpath.endswith(".pyc"),

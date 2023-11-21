@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import cx from 'classnames';
+import React, { useContext, useState } from 'react';
 import Link from 'components/link';
 import parse from 'html-react-parser';
 
 import LazyLoadImage from 'components/lazy_load_image';
+import HuntInfoContext from 'components/context';
 
 export interface Story {
   slug: string;
@@ -30,6 +32,8 @@ const StoryCard: React.FC<Props> = ({
   ...props
 }) => {
   const [interactionOpen, setInteractionOpen] = useState(false);
+  const { userInfo } = useContext(HuntInfoContext);
+  const isPublic = userInfo?.public ?? false;
 
   const storycardImg = imageUrl ? (
     <LazyLoadImage
@@ -42,7 +46,7 @@ const StoryCard: React.FC<Props> = ({
   ) : null;
 
   return (
-    <div className="story">
+    <div className={cx('story', { 'hide-spoilers': isPublic })}>
       <div className="story-anchor" id={slug} />
       {url ? (
         <>
@@ -68,6 +72,22 @@ const StoryCard: React.FC<Props> = ({
         .story-anchor {
           position: absolute;
           top: calc(-48px - 5vh);
+        }
+
+        .hide-spoilers :global(b) {
+          background: var(--black);
+          border-radius: 4px;
+          padding: 0 4px;
+          transition: all 300ms ease-in-out;
+        }
+        .hide-spoilers :global(b:not(:hover)) {
+          color: var(
+            --black
+          ) !important; /* important to override visited links */
+        }
+        .hide-spoilers :global(b:hover),
+        .hide-spoilers :global(b:focus) {
+          background: rgba(0, 0, 0, 0);
         }
 
         .story :global(img) {

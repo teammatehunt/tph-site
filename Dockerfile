@@ -74,6 +74,7 @@ FROM node_modules_dev as next_prebuild
 COPY --link client /app/client
 COPY --link client/.docker.yarnrc /app/client/.yarnrc
 COPY --link reg-client /app/reg-client
+COPY --link posthunt-client /app/posthunt-client
 # make ENABLE_POSTHUNT_SITE available to all builds
 ARG ENABLE_POSTHUNT_SITE
 ENV ENABLE_POSTHUNT_SITE=${ENABLE_POSTHUNT_SITE:-0}
@@ -90,6 +91,10 @@ ARG ENABLE_REGISTRATION_SITE
 ENV ENABLE_REGISTRATION_SITE=${ENABLE_REGISTRATION_SITE:-0}
 # build hunt site, patch webpack-runtime, and remove build cache
 RUN cd /app/reg-client && mkdir -p .next && if [ "$ENABLE_REGISTRATION_SITE" -gt 0 ]; then yarn build; fi
+
+FROM next_prebuild as next_build_posthunt_client
+# build hunt site, patch webpack-runtime, and remove build cache
+RUN cd /app/posthunt-client && mkdir -p .next && if [ "$ENABLE_POSTHUNT_SITE" -gt 0 ]; then yarn build; fi
 
 # assert we are building something
 FROM next_prebuild
@@ -134,3 +139,4 @@ COPY --link deploy/supervisord.prod.conf /etc/supervisord.conf
 
 COPY --link --from=next_build_client /app/client /app/client
 COPY --link --from=next_build_reg_client /app/reg-client /app/reg-client
+COPY --link --from=next_build_posthunt_client /app/posthunt-client /app/posthunt-client

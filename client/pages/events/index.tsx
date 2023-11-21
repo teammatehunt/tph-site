@@ -97,9 +97,9 @@ const Events: React.FC<Props> = ({
             <div className="primary">
               This event is now over. You may{' '}
               <LinkIfStatic
-                href={`/${userInfo?.public ? 'solutions' : 'events'}/${
-                  event.slug
-                }`}
+                href={`${
+                  process.env.isArchive ? `/20xx/${process.env.domainName}` : ''
+                }/${userInfo?.public ? 'solutions' : 'events'}/${event.slug}`}
               >
                 {userInfo?.public ? 'view event details' : 'submit an answer'}
               </LinkIfStatic>{' '}
@@ -116,13 +116,8 @@ const Events: React.FC<Props> = ({
 export default Events;
 
 export const getServerSideProps = async (context) => {
-  let props: Props;
-  if (process.env.isStatic) {
-    props = require('assets/json_responses/events.json');
-  } else {
-    props = await serverFetch<Props>(context, '/events', {
-      method: 'GET',
-    });
-  }
+  const props = await serverFetch<Props>(context, '/events', {
+    method: 'GET',
+  });
   return { props };
 };

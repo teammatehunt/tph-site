@@ -30,16 +30,7 @@ const PuzzlesList: FC<RoundProps> = ({ puzzles, rounds }) => {
 
 export default PuzzlesList;
 export const getPuzzlesListProps = async (context) => {
-  let props: RoundProps;
-  if (process.env.isStatic) {
-    try {
-      props = require('assets/json_responses/puzzles.json');
-    } catch {
-      props = {} as RoundProps;
-    }
-  } else {
-    props = await serverFetch<RoundProps>(context, '/puzzles');
-  }
+  const props = await serverFetch<RoundProps>(context, '/puzzles');
   return {
     props,
   };

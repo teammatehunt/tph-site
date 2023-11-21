@@ -730,16 +730,11 @@ export const getPuzzleProps =
   async (context) => {
     const { bare = false } = options;
     let puzzleData: PuzzleDataServerResponse;
-    if (process.env.isStatic) {
-      // Returns a static response for the puzzle data.
-      puzzleData = require(`assets/json_responses/puzzles/${slug}.json`);
-    } else {
-      // Fetches data from the server.
-      puzzleData = await serverFetch<PuzzleDataServerResponse>(
-        context,
-        `/puzzle/${slug}${options.solution ? '?s=1' : ''}`
-      );
-    }
+    // Fetches data from the server.
+    puzzleData = await serverFetch<PuzzleDataServerResponse>(
+      context,
+      `/puzzle/${slug}${options.solution ? '?s=1' : ''}`
+    );
 
     // Check that the puzzle is accessible
     if (puzzleData.statusCode === 404) {

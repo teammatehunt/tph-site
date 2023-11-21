@@ -5,7 +5,6 @@ import HuntInfoContext from 'components/context';
 import Section from 'components/section';
 import Title from 'components/title';
 import { formattedDateTime } from 'utils/timer';
-import StoryNotifications from 'components/story_notifications';
 
 const Rules = () => {
   const { huntInfo } = useContext(HuntInfoContext);
@@ -14,7 +13,6 @@ const Rules = () => {
   return (
     <>
       <Title title="Rules" subline="For All Our Guests" />
-      <StoryNotifications onlyFinished />
 
       {/* FIXME: Update based on this year's rules. */}
       <Section narrow heading="Format">

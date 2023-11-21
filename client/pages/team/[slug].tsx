@@ -17,7 +17,6 @@ import {
   TeamMemberFields,
   TeamMembersForm,
 } from 'components/register';
-import StoryNotifications from 'components/story_notifications';
 import Link from 'next/link';
 import LinkIfStatic from 'components/link';
 
@@ -353,7 +352,6 @@ const TeamPage = ({ teamInfo, submissions, canModify }: Props) => {
     return (
       <>
         <Title title="Team not found" />
-        <StoryNotifications onlyFinished />
         <Section>
           <p>That team could not be found.</p>
         </Section>

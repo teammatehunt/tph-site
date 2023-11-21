@@ -259,7 +259,18 @@ def add(src, sha, relative_to):
 
 def collect_hashes(root):
   for line in subprocess.check_output(
-    ["find", root, "-type", "f", "-exec", "sha256sum", "-z", "{}", ";"],
+    [
+      "find", root,
+      # filter out extra large assets since they get unzipped separately
+      "-name", "Extra Large Assets", "-prune",
+      "-o",
+      # filter out assets marked as not for the website
+      "-name", "*not for website*", "-prune",
+      "-o",
+      # get names and hashes of all other files
+      "-type", "f",
+      "-exec", "sha256sum", "-z", "{}", ";",
+    ],
     text=True,
   ).split("\0"):
     if not line:

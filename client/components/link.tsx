@@ -1,4 +1,11 @@
-import { FC, ForwardedRef, forwardRef, HTMLProps } from 'react';
+import {
+  cloneElement,
+  FC,
+  ForwardedRef,
+  forwardRef,
+  HTMLProps,
+  ReactElement,
+} from 'react';
 import NextLink, { LinkProps as NextLinkProps } from 'next/link';
 import { sanitizePath, useRouter } from 'utils/router';
 
@@ -18,6 +25,7 @@ export const Link = forwardRef<
       scroll,
       shallow,
       locale,
+      children,
       ...props
     },
     ref
@@ -25,6 +33,16 @@ export const Link = forwardRef<
     const router = useRouter();
     const sanitized = sanitizePath(router, href);
     const sanitizedAs = as ? sanitizePath(router, as) : as;
+    let body;
+    if (passHref) {
+      body = cloneElement(children as ReactElement, { ref, ...props });
+    } else {
+      body = (
+        <a ref={ref} {...props}>
+          {children}
+        </a>
+      );
+    }
     return (
       <NextLink
         href={sanitized}
@@ -38,7 +56,7 @@ export const Link = forwardRef<
           locale,
         }}
       >
-        <a ref={ref} {...props} />
+        {body}
       </NextLink>
     );
   }
@@ -58,6 +76,7 @@ export const LinkIfStatic = forwardRef<
       scroll,
       shallow,
       locale,
+      children,
       ...props
     },
     ref
@@ -71,6 +90,16 @@ export const LinkIfStatic = forwardRef<
       const router = useRouter();
       const sanitized = sanitizePath(router, href);
       const sanitizedAs = as ? sanitizePath(router, as) : as;
+      let body;
+      if (passHref) {
+        body = cloneElement(children as ReactElement, { ref, ...props });
+      } else {
+        body = (
+          <a ref={ref} {...props}>
+            {children}
+          </a>
+        );
+      }
       // TODO: figure out types for passing the forwardRef into an embedded
       // <Link/> instead of code duplication
       return (
@@ -86,11 +115,11 @@ export const LinkIfStatic = forwardRef<
             locale,
           }}
         >
-          <a ref={ref} {...props} />
+          {body}
         </NextLink>
       );
     } else {
-      return <a ref={ref} href={href} {...props} />;
+      return <a ref={ref} href={href} {...props} children={children} />;
     }
   }
 );

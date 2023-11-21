@@ -2,12 +2,10 @@ import React from 'react';
 
 import Section from 'components/section';
 import Title from 'components/title';
-import StoryNotifications from 'components/story_notifications';
 
 const HaveYouTried = () => (
   <>
     <Title title="Have You Tried..." subline="the carnival guidebook" />
-    <StoryNotifications onlyFinished />
 
     <Section narrow heading="Getting Started">
       <h5>Have you tried&hellip;</h5>

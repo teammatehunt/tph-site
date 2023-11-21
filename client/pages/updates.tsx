@@ -5,7 +5,6 @@ import HuntInfoContext, { Errata } from 'components/context';
 import Section from 'components/section';
 import Title from 'components/title';
 import { formattedDateTime } from 'utils/timer';
-import StoryNotifications from 'components/story_notifications';
 
 const Updates = () => {
   const { userInfo } = useContext(HuntInfoContext);
@@ -15,7 +14,6 @@ const Updates = () => {
   return (
     <>
       <Title title="Updates and Errata" />
-      <StoryNotifications onlyFinished />
       <Section>
         <p>Hunt updates and puzzle errata will appear here.</p>
         {(!userInfo || userInfo?.errata?.length == 0) && (

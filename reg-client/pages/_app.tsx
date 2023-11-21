@@ -2,13 +2,13 @@ import React, { useEffect } from 'react';
 import App, { AppProps } from 'next/app';
 import Error from 'next/error';
 import Head from 'next/head';
-import { useRouter } from 'next/router';
+import { useRouter } from 'utils/router';
 import Modal from 'react-modal';
 import 'styles/globals.css';
 
 import Error404 from 'pages/404';
 import HuntInfoContext, { EMPTY_HUNT_INFO, HuntInfo } from 'components/context';
-import { serverFetch, clientFetch } from 'utils/fetch';
+import { serverFetch, clientFetch, fetchHuntInfoStaticSync } from 'utils/fetch';
 import * as ga from 'utils/google_analytics';
 
 type Props = AppProps & {
@@ -29,10 +29,14 @@ export default function MyApp({
   huntInfo,
   cookies = {},
 }: Props) {
+  const router = useRouter();
+
+  if (process.env.isStatic) {
+    huntInfo = fetchHuntInfoStaticSync<HuntInfo>(router);
+  }
+
   // Default to 200 if no statusCode is explicitly given
   const { statusCode = 200, puzzleData, bare = false } = pageProps;
-
-  const router = useRouter();
 
   useEffect(() => {
     // Set app element for accessibility reasons.
@@ -114,6 +118,7 @@ export default function MyApp({
   );
 }
 
+// STATIC_SITE_REMOVE_START
 MyApp.getInitialProps = async (appContext) => {
   let huntInfo: HuntInfo;
 
@@ -144,3 +149,4 @@ MyApp.getInitialProps = async (appContext) => {
 
   return { huntInfo, ...appProps };
 };
+// STATIC_SITE_REMOVE_END

@@ -195,17 +195,8 @@ export default PuzzlesMap;
 export const getPuzzlesMapProps =
   (slug?: string, redirect = false) =>
   async (context) => {
-    let props: RoundServerResponse;
-    if (process.env.isStatic) {
-      try {
-        props = require('assets/json_responses/puzzles.json');
-      } catch {
-        props = {} as RoundServerResponse;
-      }
-    } else {
-      const url = slug ? `/rounds/${slug}` : '/puzzles';
-      props = await serverFetch<RoundServerResponse>(context, url);
-    }
+    const url = slug ? `/rounds/${slug}` : '/puzzles';
+    const props = await serverFetch<RoundServerResponse>(context, url);
 
     if (props.redirect) {
       return {
