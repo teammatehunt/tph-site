@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # base contains system packages
-FROM nikolaik/python-nodejs:python3.9-nodejs16@sha256:e858a798bf7ec2f4174e7ff756e6c83eb123b687e451a9bf8aced59fa9d2be75 as base
+FROM nikolaik/python-nodejs:python3.12-nodejs21 as base
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
 	brotli \
@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 	libpq-dev \
 	supervisor
 
-ENV POETRY_VERSION 1.2.1
+ENV POETRY_VERSION 1.7.1
 ENV PYTHONUNBUFFERED 1
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PIP_NO_CACHE_DIR 1

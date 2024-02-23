@@ -10,37 +10,37 @@ authors = ["teammate"]
 
 # Requirements
 [tool.poetry.dependencies]
-python = "==3.9.16"
-beautifulsoup4 = "==4.9.3"
-celery = "==5.2.4"
-channels = "==3.0.4"
-channels-redis = "==3.4.1"
-cryptography = "==36.0.1"
-"discord.py" = "==2.0.1"
-Django = "==4.0.7"
-django-anymail = "==8.5"
-django-bleach = "==1.0.0"
-django-extensions = "==3.1.5"
-django-impersonate = "==1.8.1"
-django-phonenumber-field = {version = "==7.0.0", extras = ["phonenumberslite"]}
+python = ">3.12,<3.13"
+beautifulsoup4 = "^4.12"
+celery = "^5.3"
+channels = "^3.0"
+channels-redis = "^4.2"
+cryptography = "^36.0.1"
+"discord.py" = "^2.3.2"
+Django = "^5.0"
+django-anymail = "^8.5"
+django-bleach = "^1.0.0"
+django-extensions = "^3.1.5"
+django-impersonate = "^1.8.1"
+django-phonenumber-field = {version = "^7.0.0", extras = ["phonenumberslite"]}
 django-prometheus = "^2.2.0"
-django-ratelimit = "==3.0.0"
-emoji = "==1.5.0"
-html2text = "==2020.1.16"
-IMAPClient = "==2.2.0"
-Markdown = "==3.2.2"
-numpy = "==1.21.2"
-Pillow = "==7.1.2" # sync-media
-polygenerator = "==0.2.0"
-psycopg2 = "==2.8.5"
-python-dateutil = "==2.8.1"
-pyyaml = "==5.3.1"
-redis = "==4.3.4"
-requests = "==2.25.1"
-ujson = "==5.6.0"
-unidecode = "==1.3.4"
-uvicorn = {version = "==0.18.3", extras = ["standard"]}
-whitenoise = {version = "==6.0.0", extras = ["brotli"]}
+django-ratelimit = "^3.0.0"
+emoji = "^1.5.0"
+html2text = "^2020.1.16"
+IMAPClient = "^2.2.0"
+Markdown = "^3.2.2"
+numpy = "^1.21.2"
+Pillow = "^7.1.2" # sync-media
+polygenerator = "^0.2.0"
+psycopg2 = "^2.9"
+python-dateutil = "^2.8.1"
+pyyaml = "^5.3.1,<5.4"
+redis = "^4.3.4"
+requests = "^2.25.1"
+ujson = "^5.6.0"
+unidecode = "^1.3.4"
+uvicorn = {version = "^0.27.1", extras = ["standard"]}
+whitenoise = {version = "^6.0.0", extras = ["brotli"]}
 
 # List of optional requirements for full server dependencies
 [tool.poetry.extras]
@@ -49,4 +49,4 @@ full = []
 # Dev Requirements
 [tool.poetry.dev-dependencies]
 django-silk = "==5.0.1"
-pre-commit = "==2.17.0"
+pre-commit = "^3.6"
