@@ -19,7 +19,7 @@ services:
         soft: 20000
         hard: 40000
   pgbouncer:
-    image: edoburu/pgbouncer:1.18.0
+    image: edoburu/pgbouncer:1.21.0-p2
     restart: unless-stopped
     environment:
       - DB_HOST=db
