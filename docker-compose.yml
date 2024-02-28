@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   db:
-    image: postgres:13.2
+    image: postgres:16.2
     restart: unless-stopped
     environment:
       - POSTGRES_DB=postgres
@@ -36,7 +36,7 @@ services:
     depends_on:
       - db
   redis:
-    image: redis:6.2.1
+    image: redis:7.2.4
     restart: unless-stopped
     deploy:
       replicas: ${REDIS_REPLICAS:-1}
