@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 	libpq-dev \
 	supervisor
 
-ENV POETRY_VERSION 1.7.1
+ENV POETRY_VERSION 1.8.1
 ENV PYTHONUNBUFFERED 1
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PIP_NO_CACHE_DIR 1
