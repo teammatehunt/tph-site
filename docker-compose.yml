@@ -12,7 +12,7 @@ services:
       # allow database replication with authentication
       - ./scripts/pg_replica/pg_hba_init.sh:/docker-entrypoint-initdb.d/pg_hba_init.sh:ro
     # ensure pg_hba.conf is set
-    command: /docker-entrypoint-initdb.d/pg_hba_init.sh /docker-entrypoint.sh postgres
+    command: /docker-entrypoint-initdb.d/pg_hba_init.sh docker-entrypoint.sh postgres
     shm_size: ${DB_SHM_SIZE:-64mb}
     ulimits:
       nofile:
@@ -29,6 +29,7 @@ services:
       - MAX_CLIENT_CONN=2000
       - DEFAULT_POOL_SIZE=2000
       - CLIENT_IDLE_TIMEOUT=3600
+      - AUTH_TYPE=scram-sha-256
     ulimits:
       nofile:
         soft: 20000
