@@ -33,7 +33,7 @@ jobs:
           # Export env to be reused in later steps. Like `env >> $GITHUB_ENV` but works with multiline values
           env -0 | tr '\n' '\r' | tr '\0' '\n' | cut -s -d'=' -f1 | xargs -I{} sh -c 'printf "{}<<ENV_EOF\n%s\nENV_EOF\n" "${}"' >> $GITHUB_ENV
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Copy files
         run: >-
           mkdir $TEST_DIR
