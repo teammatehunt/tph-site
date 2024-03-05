@@ -1,7 +1,7 @@
 import React, { Fragment, useRef } from 'react';
 import { Link, LinkProps } from 'components/link';
 import { Menu, Transition } from '@headlessui/react';
-import { ChevronDownIcon } from '@heroicons/react/solid';
+import { ChevronDownIcon } from '@heroicons/react/24/solid';
 import { useRouter } from 'utils/router';
 import cx from 'classnames';
 

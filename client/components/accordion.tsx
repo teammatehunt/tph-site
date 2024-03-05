@@ -1,6 +1,6 @@
 import React, { Fragment } from 'react';
 import { Disclosure } from '@headlessui/react';
-import { ChevronDownIcon } from '@heroicons/react/outline';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import cx from 'classnames';
 
 // Defines an accordion UI (shows heading only, expanding inner content if it doesn't exist.

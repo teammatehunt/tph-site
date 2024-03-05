@@ -1,6 +1,5 @@
 import React, { useContext } from 'react';
 import { trackWindowScroll } from 'react-lazy-load-image-component';
-import { ArrowRightIcon } from '@heroicons/react/outline';
 
 import HuntInfoContext from 'components/context';
 import Section from 'components/section';

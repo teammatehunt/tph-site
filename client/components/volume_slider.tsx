@@ -1,7 +1,7 @@
 import React, { FunctionComponent, useEffect, useState } from 'react';
 import Slider from 'react-rangeslider';
 import { Howler } from 'howler';
-import { VolumeOffIcon, VolumeUpIcon } from '@heroicons/react/solid';
+import { SpeakerXMarkIcon, SpeakerWaveIcon } from '@heroicons/react/24/solid';
 
 import { TICK_SOUND_EFFECTS } from 'utils/timer';
 import { useLocalStorage } from 'utils/storage';
@@ -43,12 +43,12 @@ const VolumeSlider: FunctionComponent<{}> = () => {
     <>
       <div className="flex items-center justify-center m-1">
         {volume <= 0 ? (
-          <VolumeOffIcon
+          <SpeakerXMarkIcon
             className="h-5 w-5 mr-2 volume-icon"
             onClick={toggleMute}
           />
         ) : (
-          <VolumeUpIcon
+          <SpeakerWaveIcon
             className="h-5 w-5 mr-2 volume-icon"
             onClick={toggleMute}
           />
