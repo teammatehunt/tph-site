@@ -75,11 +75,7 @@ const UnlockForm: React.FC<Props> = ({ rounds, currency, used }) => {
         </InfoIcon>
       </div>
       <p>
-        Return to{' '}
-        <Link href="/events">
-          <a>Events page</a>
-        </Link>
-        .
+        Return to <Link href="/events">Events page</Link>.
       </p>
 
       <div className="flex justify-between">

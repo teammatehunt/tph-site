@@ -89,7 +89,7 @@ const Leaderboard = ({ teams }) => {
                   <td>
                     <Tent win={!!team.metameta_solve_time}>
                       <Link href="/team/[slug]" as={`/team/${team.slug}`}>
-                        <a>{team.team_name}</a>
+                        {team.team_name}
                       </Link>
                     </Tent>
                   </td>

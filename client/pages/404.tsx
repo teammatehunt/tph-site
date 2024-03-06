@@ -23,14 +23,10 @@ export default function Custom404() {
           {!userInfo?.teamInfo && (
             <>
               <PublicAccessLink />
-              <Link href="/login">
-                <a>Login</a>
-              </Link>
+              <Link href="/login">Login</Link>
             </>
           )}
-          <Link href="/">
-            <a>Back to Home</a>
-          </Link>
+          <Link href="/">Back to Home</Link>
         </div>
       </Section>
     </>

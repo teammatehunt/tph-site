@@ -77,14 +77,10 @@ const Solution: FunctionComponent<Props> = ({
           )}
           <div className="link space-x-2">
             {answer && (
-              <Link href={`/stats/${puzzleData.slug}`} passHref>
-                <a>View Stats</a>
-              </Link>
+              <Link href={`/stats/${puzzleData.slug}`}>View Stats</Link>
             )}
             {puzzleData.url && (
-              <Link href={puzzleData.url} passHref>
-                <a>Back to Puzzle</a>
-              </Link>
+              <Link href={puzzleData.url}>Back to Puzzle</Link>
             )}
           </div>
         </div>

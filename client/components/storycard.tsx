@@ -51,7 +51,7 @@ const StoryCard: React.FC<Props> = ({
       {url ? (
         <>
           <Link href={url} shallow={shallow}>
-            <a>{storycardImg}</a>
+            {storycardImg}
           </Link>
           <p className="px-8 py-5">{parse(text)}</p>
         </>

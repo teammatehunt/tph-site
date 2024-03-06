@@ -495,8 +495,13 @@ const Puzzle: FC<PuzzleProps> = ({
       </Head>
       <div className="top-right flex flex-wrap justify-end space-x-2 print:hidden">
         {getTopRightLinks.map(({ href, text, shallow = false }, i) => (
-          <Link key={`topright-${i}`} href={href} shallow={shallow}>
-            <a className="bg-navbar p-1.5 rounded-lg secondary">{text}</a>
+          <Link
+            key={`topright-${i}`}
+            href={href}
+            shallow={shallow}
+            className="bg-navbar p-1.5 rounded-lg secondary"
+          >
+            {text}
           </Link>
         ))}
       </div>

@@ -23,8 +23,8 @@ const Footer = () => {
         <div className="p-3 lg:py-0 lg:px-12 flex flex-col text-center lg:text-left">
           <div>
             <div>This website is not a puzzle</div>
-            <Link href="/register">
-              <a className="block">Reserve tickets</a>
+            <Link href="/register" className="block">
+              Reserve tickets
             </Link>
           </div>
         </div>
@@ -32,8 +32,8 @@ const Footer = () => {
       <div className="px-6 pb-6 text-center lg:text-right lg:w-[90vw] lg:mx-auto">
         <span>© FIXME HUNT</span>
         <span>&nbsp;&nbsp;</span>
-        <Link href="/privacy">
-          <a className="privacy-link">Privacy</a>
+        <Link href="/privacy" className="privacy-link">
+          Privacy
         </Link>
       </div>
       <style jsx>{`

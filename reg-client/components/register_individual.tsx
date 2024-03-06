@@ -148,12 +148,8 @@ const RegisterIndividual = ({
               username and password.
             </p>
             <p className="flex md:space-x-8">
-              <Link href="/register">
-                <a>See our illustrious guests</a>
-              </Link>
-              <Link href="/logout">
-                <a>Click here to log out</a>
-              </Link>
+              <Link href="/register">See our illustrious guests</Link>
+              <Link href="/logout">Click here to log out</Link>
             </p>
           </span>
         </div>
@@ -163,10 +159,8 @@ const RegisterIndividual = ({
             This is the registration form for individual hunters, i.e.,
             currently unattached to a team. If you're part of a team already,
             you should have one of your team members sign up with the{' '}
-            <Link href="/register-team">
-              <a>team registration form,</a>
-            </Link>{' '}
-            not this one.
+            <Link href="/register-team">team registration form,</Link> not this
+            one.
           </p>
           <IndividualRegistrationClosed />
         </>

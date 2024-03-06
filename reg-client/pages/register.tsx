@@ -22,21 +22,25 @@ const RegisterPage = ({ teamsList }) => {
     <>
       <p>
         Already registered?{' '}
-        <Link href="/login">
-          <a className="white">Click here to log in.</a>
+        <Link href="/login" className="white">
+          Click here to log in.
         </Link>
       </p>
       <div className="flex flex-wrap lg:space-x-4 flex-col lg:flex-row">
         <div className="pt-3">
-          <Link href="/register-team">
-            <a className="button-link button-link-accent">Reserve as a team</a>
+          <Link
+            href="/register-team"
+            className="button-link button-link-accent"
+          >
+            Reserve as a team
           </Link>
         </div>
         <div className="pt-3">
-          <Link href="/register-individual">
-            <a className="button-link button-link-white">
-              Reserve without a team
-            </a>
+          <Link
+            href="/register-individual"
+            className="button-link button-link-white"
+          >
+            Reserve without a team
           </Link>
         </div>
       </div>
@@ -45,16 +49,19 @@ const RegisterPage = ({ teamsList }) => {
 
   const loggedInTeamContent = (
     <div className="pt-3">
-      <Link href="/register-team">
-        <a className="button-link button-link-white">Your reservation</a>
+      <Link href="/register-team" className="button-link button-link-white">
+        Your reservation
       </Link>
     </div>
   );
 
   const loggedInIndividualContent = (
     <div className="pt-3">
-      <Link href="/register-individual">
-        <a className="button-link button-link-white">Your reservation</a>
+      <Link
+        href="/register-individual"
+        className="button-link button-link-white"
+      >
+        Your reservation
       </Link>
     </div>
   );

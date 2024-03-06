@@ -444,10 +444,8 @@ const LandingPage = (props) => {
       <Highlights />
       <Updates />
       <WideBanner>
-        <Link href="/register">
-          <a className="call-to-action text-3xl lg:text-5xl">
-            Reserve your tickets now →
-          </a>
+        <Link href="/register" className="call-to-action text-3xl lg:text-5xl">
+          Reserve your tickets now →
         </Link>
       </WideBanner>
       <Footer />

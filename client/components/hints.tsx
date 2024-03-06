@@ -327,12 +327,6 @@ const HintPage: React.FC<Props> = ({
   className,
   children,
 }) => {
-  const BackButton = (
-    <a className="bg-navbar p-1.5 rounded-lg mb-2" onClick={onBack}>
-      Back to Puzzle
-    </a>
-  );
-
   return (
     <div
       className={cx('container', {
@@ -344,8 +338,12 @@ const HintPage: React.FC<Props> = ({
       </Head>
 
       <div className="top-right">
-        <Link href={puzzleData.url} passHref>
-          {BackButton}
+        <Link
+          href={puzzleData.url}
+          className="bg-navbar p-1.5 rounded-lg mb-2"
+          onClick={onBack}
+        >
+          Back to Puzzle
         </Link>
       </div>
 
