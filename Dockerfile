@@ -25,8 +25,8 @@ RUN pip install "poetry==${POETRY_VERSION}"
 
 # build caddy
 FROM caddy:2.7.6-builder-alpine as caddy_builder
-ENV CADDY_VERSION v2.7.6
-RUN xcaddy build --with github.com/caddy-dns/duckdns@7597f2ebdc32bb34474937c9adf1391beb7cb5fe
+ENV CADDY_VERSION 6d9a83376b5e19b3c0368541ee46044ab284038b
+RUN xcaddy build --with github.com/caddy-dns/duckdns@77870e12bac552ceb76917d82ced6db84b958c1f
 
 # generate python virtual environment
 FROM base as python_env
