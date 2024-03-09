@@ -33,7 +33,6 @@ FROM base as python_env
 # install all dependencies to a virtual env
 RUN python -m venv /.venv
 COPY server/poetry/pyproject.toml server/poetry/poetry.lock ./
-RUN poetry lock --no-update
 RUN poetry install --no-interaction --no-cache --no-root --without dev
 
 # add dev dependencies to virtual environment
@@ -45,7 +44,7 @@ RUN poetry install --no-interaction --no-cache --no-root ${FULL_PYTHON:+--extras
 FROM base as node_modules_dev
 COPY client/package.json client/yarn.lock ./
 # no --ignore-optional so we get SWC compilation
-RUN yarn install --non-interactive
+RUN yarn install --non-interactive --frozen-lockfile
 
 # settings for dev and prod
 FROM base as output_base
