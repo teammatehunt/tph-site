@@ -109,10 +109,7 @@ const HuntOver = () => {
                 Browse the museum as <PublicAccessLink />
                 {!process.env.isStatic && (
                   <>
-                    , or{' '}
-                    <Link href="/login">
-                      <a>login here</a>
-                    </Link>
+                    , or <Link href="/login">login here</Link>
                   </>
                 )}
                 .

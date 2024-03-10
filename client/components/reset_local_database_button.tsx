@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useContext, useState } from 'react';
 import cx from 'classnames';
-import { XCircleIcon } from '@heroicons/react/outline';
+import { XCircleIcon } from '@heroicons/react/24/outline';
 
 import { clientFetch } from 'utils/fetch';
 import { useRouter } from 'utils/router';

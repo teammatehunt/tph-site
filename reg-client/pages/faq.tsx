@@ -135,10 +135,8 @@ const Faq = () => {
               icon={<SvgTicket />}
               content={
                 <>
-                  <Link href="/register">
-                    <a>Reserve tickets</a>
-                  </Link>{' '}
-                  before December 31 to guarantee your spot.
+                  <Link href="/register">Reserve tickets</Link> before December
+                  31 to guarantee your spot.
                 </>
               }
             />
@@ -160,9 +158,7 @@ const Faq = () => {
                   {process.env.isArchive ? (
                     'Let us know,'
                   ) : (
-                    <Link href="/register-individual">
-                      <a>Let us know,</a>
-                    </Link>
+                    <Link href="/register-individual">Let us know,</Link>
                   )}{' '}
                   and we’ll find you a group to join.
                 </>

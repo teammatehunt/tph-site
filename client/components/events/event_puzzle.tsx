@@ -9,9 +9,7 @@ const EventPuzzle = () => {
         completing the event.
       </InfoIcon>
       <p>
-        <Link href="/events">
-          <a>Return to the Events page</a>
-        </Link>
+        <Link href="/events">Return to the Events page</Link>
       </p>
     </div>
   );

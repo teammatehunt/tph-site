@@ -65,11 +65,7 @@ const ResetPassword = ({ valid }: Props) => {
         <SectionHeading>Password successfully reset</SectionHeading>
         <p className="mt-2">
           Your password has successfully been reset, and you should now be able
-          to{' '}
-          <Link href="/login">
-            <a>log in</a>
-          </Link>
-          .
+          to <Link href="/login">log in</Link>.
         </p>
       </Section>
     );

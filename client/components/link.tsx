@@ -33,20 +33,11 @@ export const Link = forwardRef<
     const router = useRouter();
     const sanitized = sanitizePath(router, href);
     const sanitizedAs = as ? sanitizePath(router, as) : as;
-    let body;
-    if (passHref) {
-      body = cloneElement(children as ReactElement, { ref, ...props });
-    } else {
-      body = (
-        <a ref={ref} {...props}>
-          {children}
-        </a>
-      );
-    }
     return (
       <NextLink
         href={sanitized}
         as={sanitizedAs}
+        ref={ref}
         {...{
           replace,
           passHref,
@@ -54,9 +45,10 @@ export const Link = forwardRef<
           scroll,
           shallow,
           locale,
+          ...props,
         }}
       >
-        {body}
+        {children}
       </NextLink>
     );
   }
@@ -90,22 +82,13 @@ export const LinkIfStatic = forwardRef<
       const router = useRouter();
       const sanitized = sanitizePath(router, href);
       const sanitizedAs = as ? sanitizePath(router, as) : as;
-      let body;
-      if (passHref) {
-        body = cloneElement(children as ReactElement, { ref, ...props });
-      } else {
-        body = (
-          <a ref={ref} {...props}>
-            {children}
-          </a>
-        );
-      }
       // TODO: figure out types for passing the forwardRef into an embedded
       // <Link/> instead of code duplication
       return (
         <NextLink
           href={sanitized}
           as={sanitizedAs}
+          ref={ref}
           {...{
             replace,
             passHref,
@@ -113,9 +96,10 @@ export const LinkIfStatic = forwardRef<
             scroll,
             shallow,
             locale,
+            ...props,
           }}
         >
-          {body}
+          {children}
         </NextLink>
       );
     } else {

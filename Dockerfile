@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # base contains system packages
-FROM nikolaik/python-nodejs:python3.9-nodejs16@sha256:e858a798bf7ec2f4174e7ff756e6c83eb123b687e451a9bf8aced59fa9d2be75 as base
+FROM nikolaik/python-nodejs:python3.12-nodejs21 as base
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
 	brotli \
@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 	libpq-dev \
 	supervisor
 
-ENV POETRY_VERSION 1.2.1
+ENV POETRY_VERSION 1.8.1
 ENV PYTHONUNBUFFERED 1
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PIP_NO_CACHE_DIR 1
@@ -24,15 +24,18 @@ ENV PATH "/.venv/bin:${PATH}"
 RUN pip install "poetry==${POETRY_VERSION}"
 
 # build caddy
-FROM caddy:2.6.2-builder-alpine as caddy_builder
-ENV CADDY_VERSION 6bad878a22e048762262d6fabe2144cefaf4ca81
-RUN xcaddy build --with github.com/caddy-dns/duckdns@7597f2ebdc32bb34474937c9adf1391beb7cb5fe
+FROM caddy:2.7.6-builder-alpine as caddy_builder
+ENV CADDY_VERSION 6d9a83376b5e19b3c0368541ee46044ab284038b
+RUN xcaddy build --with github.com/caddy-dns/duckdns@77870e12bac552ceb76917d82ced6db84b958c1f
 
 # generate python virtual environment
 FROM base as python_env
 # install all dependencies to a virtual env
 RUN python -m venv /.venv
 COPY server/poetry/pyproject.toml server/poetry/poetry.lock ./
+
+# If you need to copy the lockfile off of the running container, uncomment this line
+# RUN poetry lock --no-update
 RUN poetry install --no-interaction --no-cache --no-root --without dev
 
 # add dev dependencies to virtual environment
@@ -43,8 +46,11 @@ RUN poetry install --no-interaction --no-cache --no-root ${FULL_PYTHON:+--extras
 # node_modules for dev and next build
 FROM base as node_modules_dev
 COPY client/package.json client/yarn.lock ./
+
 # no --ignore-optional so we get SWC compilation
 RUN yarn install --non-interactive --frozen-lockfile
+# If you need to copy the lockfile off of the layer, uncomment this line
+# RUN yarn install --non-interactive
 
 # settings for dev and prod
 FROM base as output_base

@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { MenuIcon } from '@heroicons/react/outline';
+import { Bars3Icon } from '@heroicons/react/24/outline';
 import { useRouter } from 'utils/router';
 import cx from 'classnames';
 import dynamic from 'next/dynamic';
@@ -73,7 +73,7 @@ const Layout: React.FC<Props> = ({ children }) => {
             aria-expanded={!isNavbarCollapsed}
             onClick={() => setNavbarCollapsed((collapsed) => !collapsed)}
           >
-            <MenuIcon className="h-6 w-6" />
+            <Bars3Icon className="h-6 w-6" />
           </button>
 
           <div className="nav-list">

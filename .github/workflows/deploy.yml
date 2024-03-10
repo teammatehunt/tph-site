@@ -140,7 +140,7 @@ jobs:
           # ensure directory is set
           [ -n "$DEPLOY_DIR_DEFAULTED" ] && [ -z "${DEPLOY_DIR_DEFAULTED//[^ ]/}" ]
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Remove previous files
         run: >-
           ssh -vvv $DEPLOY_USER@$DEPLOY_HOST

@@ -19,9 +19,9 @@ if [ -f "${PGDATA}/pg_hba.conf" ]; then
 	host    replication     all             ::1/128                 trust
 
   # Allow authenticated users to connect from anywhere
-	host    all             all             all                     md5
+	host    all             all             all                     scram-sha-256
   # Allow authenticated users to perform replication
-	host    replication     all             all                     md5
+	host    replication     all             all                     scram-sha-256
 	EOF
 fi
 

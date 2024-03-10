@@ -61,11 +61,7 @@ const ResetPassword = ({ valid }: Props) => {
     return (
       <Section narrow heading="Password successfully reset">
         Your team's password has successfully been reset, and you should now be
-        able to{' '}
-        <Link href="/login">
-          <a>log in</a>
-        </Link>
-        .
+        able to <Link href="/login">log in</Link>.
       </Section>
     );
   }

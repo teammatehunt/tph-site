@@ -7,7 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { Transition } from '@headlessui/react';
-import { XIcon } from '@heroicons/react/outline';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import cx from 'classnames';
 import { Howl } from 'howler';
 
@@ -236,7 +236,7 @@ const Notification: FC<NotificationProps> = ({
           e.preventDefault();
         }}
       >
-        <XIcon className="w-4 h-4" />
+        <XMarkIcon className="w-4 h-4" />
       </button>
       <div className="notif-bg" />
       <div className="p-4 flex flex-col">

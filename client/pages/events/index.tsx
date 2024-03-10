@@ -66,16 +66,12 @@ const Events: React.FC<Props> = ({
               .
             </InfoIcon>
             <p>{parse(info)}</p>
-            <Link href="/events/free-answer">
-              <a>Use a free answer</a>
-            </Link>
+            <Link href="/events/free-answer">Use a free answer</Link>
             <br />
-            <Link href="/events/unlock">
-              <a>Unlock a new puzzle</a>
-            </Link>
+            <Link href="/events/unlock">Unlock a new puzzle</Link>
             <br />
             <Link href="/events/stronger-free-answer">
-              <a>Use a strong free answer</a>
+              Use a strong free answer
             </Link>
           </div>
         )}

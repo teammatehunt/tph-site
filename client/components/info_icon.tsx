@@ -2,9 +2,9 @@ import React, { FC, HTMLProps, ReactFragment } from 'react';
 import cx from 'classnames';
 import dynamic from 'next/dynamic';
 import {
-  ExclamationIcon,
+  ExclamationTriangleIcon,
   InformationCircleIcon,
-} from '@heroicons/react/outline';
+} from '@heroicons/react/24/outline';
 
 const ReactTooltip = dynamic(() => import('react-tooltip'), {
   ssr: false,
@@ -36,7 +36,7 @@ const InfoIcon: FC<Props & HTMLProps<HTMLSpanElement>> = ({
   className,
   children,
 }) => {
-  const Component = warning ? ExclamationIcon : InformationCircleIcon;
+  const Component = warning ? ExclamationTriangleIcon : InformationCircleIcon;
   return (
     <>
       <div

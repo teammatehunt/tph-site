@@ -8,8 +8,8 @@ export default function Custom404() {
     <RegistrationPageBase title="404 - Page Not Found">
       <section className="bg-off-white mx-auto flex flex-col items-center justify-center text-center h-[40vh] sm:h-[65vh]">
         <SubsectionHeading>Page Not Found</SubsectionHeading>
-        <Link href="/">
-          <a className="mt-4">Back to the museum</a>
+        <Link href="/" className="mt-4">
+          Back to the museum
         </Link>
       </section>
     </RegistrationPageBase>

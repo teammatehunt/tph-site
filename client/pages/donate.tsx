@@ -39,9 +39,7 @@ const DonationPage = () => {
           <input type="submit" name="donate" value="Donate" />
         </form>
 
-        <Link href="/faq">
-          <a>Back to FAQ</a>
-        </Link>
+        <Link href="/faq">Back to FAQ</Link>
       </Section>
 
       <style jsx>{`

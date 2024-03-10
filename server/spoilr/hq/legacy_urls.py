@@ -11,6 +11,6 @@ urlpatterns += [
     path("", dashboard.dashboard, name="hq"),
     path("log/", log.system_log_view, name="hq_log"),
     path("log_csv/", log.system_log_csv_export, name="hq_log_csv"),
-    re_path("^hint-log/(\d+)?$", log.hint_log_view, name="hq_hintlog"),
+    re_path(r"^hint-log/(\d+)?$", log.hint_log_view, name="hq_hintlog"),
     path("updates/", updates.updates_view, name="hq_updates"),
 ]

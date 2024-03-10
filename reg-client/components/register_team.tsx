@@ -171,12 +171,8 @@ const RegisterTeam = ({
               your team's registration at any time until Hunt starts.
             </p>
             <p className="flex md:space-x-8">
-              <Link href="/register">
-                <a>See our illustrious guests</a>
-              </Link>
-              <Link href="/logout">
-                <a>Click here to log out</a>
-              </Link>
+              <Link href="/register">See our illustrious guests</Link>
+              <Link href="/logout">Click here to log out</Link>
             </p>
           </span>
         </div>
